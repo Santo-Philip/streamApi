@@ -1,0 +1,41 @@
+# Python-specific ignores
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Pyrogram-specific ignores
+sessions/
+*.session
+*.session-journal
+
+
+# Logs and temporary files
+*.log
+*.log.*
+*.tmp
+temp/
+
+# IDE and editor files
+.idea/
+.vscode/
+*.sublime-project
+*.sublime-workspace
+
+# OS-specific files
+.DS_Store
+Thumbs.db
+
+# Dependency management
+pip-log.txt
+Pipfile.lock
