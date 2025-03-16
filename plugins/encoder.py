@@ -1,9 +1,13 @@
 import asyncio
 import os
 import shutil
+import logging
 from database.video import insert_video
 from plugins.video import que
 
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 async def encode_video():
     while True:
@@ -21,10 +25,29 @@ async def encode_video():
         os.makedirs(hls_dir, exist_ok=True)
 
         if not progress_message:
+            logger.warning("No progress message provided, skipping task")
             que.task_done()
-            continue  # Skip if progress message is missing
+            continue
 
         await progress_message.edit_text("🚀 Encoding Started... [0%]")
+
+        # Check if FFmpeg is installed
+        ffmpeg_check = await asyncio.create_subprocess_shell(
+            "ffmpeg -version",
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE
+        )
+        stdout, stderr = await ffmpeg_check.communicate()
+        if ffmpeg_check.returncode != 0:
+            await progress_message.edit_text(f"❌ FFmpeg not found or failed: {stderr.decode()}")
+            que.task_done()
+            continue
+
+        # Verify input file exists
+        if not os.path.exists(file_path):
+            await progress_message.edit_text(f"❌ Input file not found: {file_path}")
+            que.task_done()
+            continue
 
         # FFmpeg command to generate HLS files
         cmd = (
@@ -33,30 +56,33 @@ async def encode_video():
             f'-progress pipe:1 '
             f'"{hls_dir}/output.m3u8"'
         )
+        logger.info(f"Running FFmpeg command: {cmd}")
 
         process = await asyncio.create_subprocess_shell(
-            cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
+            cmd,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE
         )
 
-        while process.returncode is None:  # Keep checking progress while FFmpeg is running
-            await asyncio.sleep(2)  # Wait 2 seconds before checking progress
+        # Capture FFmpeg output for debugging
+        stdout, stderr = await process.communicate()
+        return_code = process.returncode
 
-            # Count the number of .ts files generated so far
+        # Progress tracking (simplified for now, can be re-added if needed)
+        while process.returncode is None:
+            await asyncio.sleep(2)
             ts_files = [f for f in os.listdir(hls_dir) if f.endswith(".ts")]
             segment_count = len(ts_files)
-
-            # Estimate progress (Assume 100 segments for a full-length video)
             progress = min(100, int((segment_count / 100) * 100))
-            bar = "█" * (progress // 5) + " " * (20 - (progress // 5))  # 20-block bar
-
+            bar = "█" * (progress // 5) + " " * (20 - (progress // 5))
             try:
                 await progress_message.edit_text(f"🚀 Encoding... \n\n[{bar}] {progress}%")
             except Exception:
-                pass  # Prevent crashes if the message cannot be edited
+                pass
 
         await process.wait()
 
-        if process.returncode == 0:
+        if return_code == 0:
             file_size = os.path.getsize(file_path)
             await progress_message.edit_text(
                 "✅ **Encoding Complete!** 🎉\n\n"
@@ -67,9 +93,11 @@ async def encode_video():
             )
             insert_video(msg, file_id, file_name)
         else:
-            await progress_message.edit_text("❌ Encoding Failed! Cleaning up files...")
+            error_message = stderr.decode() if stderr else "Unknown error"
+            await progress_message.edit_text(f"❌ Encoding Failed!\n\nError: {error_message}")
+            logger.error(f"FFmpeg failed with code {return_code}: {error_message}")
 
-            # Ensure cleanup of the video file and folder
+            # Cleanup on failure
             try:
                 if os.path.exists(file_path):
                     os.remove(file_path)
@@ -77,5 +105,10 @@ async def encode_video():
                     shutil.rmtree(hls_dir, ignore_errors=True)
             except Exception as e:
                 await progress_message.edit_text(f"⚠️ Cleanup Error: {e}")
+                logger.error(f"Cleanup failed: {e}")
 
         que.task_done()
+
+# Example usage (if running standalone)
+if __name__ == "__main__":
+    asyncio.run(encode_video())
