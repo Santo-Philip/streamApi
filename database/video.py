@@ -3,9 +3,8 @@ from database.spbase import supabase
 from typing import Optional, List, Dict, Any
 
 
-def insert_video( msg, file_id, file_name):
-    print(file_id)
-    unique_id = str(uuid.uuid4())  # Generate a unique token
+def insert_video( msg, file_id, file_name, unique_id):
+     # Generate a unique token
 
     data = {
         "user": msg.from_user.id,

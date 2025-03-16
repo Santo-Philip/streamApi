@@ -2,10 +2,11 @@ import asyncio
 import os
 import shutil
 import logging
+import uuid
+
 from database.video import insert_video
 from plugins.video import que
 
-# Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -81,7 +82,7 @@ async def encode_video():
                 pass
 
         await process.wait()
-
+        unique_id = str(uuid.uuid4())
         if return_code == 0:
             file_size = os.path.getsize(file_path)
             await progress_message.edit_text(
@@ -90,8 +91,9 @@ async def encode_video():
                 f"🔹 **Filename:** `{file_name}`\n"
                 f"🔹 **Size:** `{round(file_size / (1024 * 1024), 2)} MB`\n\n"
                 "⚡ **Completed...**"
+                f"**Link** : https://media.mehub.in/video/{unique_id}"
             )
-            insert_video(msg, file_id, file_name)
+            insert_video(msg, file_id, file_name ,unique_id)
         else:
             error_message = stderr.decode() if stderr else "Unknown error"
             await progress_message.edit_text(f"❌ Encoding Failed!\n\nError: {error_message}")

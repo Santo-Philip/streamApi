@@ -12,7 +12,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 load_dotenv()
 BASE_DIR = os.path.join(os.getcwd(), "downloads")
-logo_url = os.getenv("LOGO_URL", "https://example.com/default-logo.png")
+logo_url = os.getenv("LOGO", "https://example.com/default-logo.png")
 
 if not os.path.exists(BASE_DIR):
     os.makedirs(BASE_DIR)
