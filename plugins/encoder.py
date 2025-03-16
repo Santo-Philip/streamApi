@@ -108,7 +108,3 @@ async def encode_video():
                 logger.error(f"Cleanup failed: {e}")
 
         que.task_done()
-
-# Example usage (if running standalone)
-if __name__ == "__main__":
-    asyncio.run(encode_video())
