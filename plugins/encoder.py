@@ -6,7 +6,6 @@ import uuid
 from database.video import insert_video
 from plugins.video import que
 
-# Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -50,11 +49,12 @@ async def encode_video():
             que.task_done()
             continue
 
-        # FFmpeg command to use only the default audio track
+        # FFmpeg command: Copy video, re-encode only default audio
         cmd = (
             f'ffmpeg -hide_banner -y -i "{file_path}" '
-            f'-map 0:v -map 0:a:0 '  # Map video and only the default audio track
-            f'-c:v libx264 -c:a aac -b:a 192k '  # Re-encode to H.264/AAC
+            f'-map 0:v -map 0:a:0 '  # Map video and default audio
+            f'-c:v copy -c:a aac -b:a 128k '  # Copy video, re-encode audio to AAC
+            f'-preset ultrafast -threads 0 '  # Optimize speed
             f'-hls_time 5 -hls_list_size 0 '
             f'-hls_segment_filename "{hls_dir}/segment%d.ts" '
             f'-progress pipe:1 '
