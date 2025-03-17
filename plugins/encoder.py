@@ -64,16 +64,18 @@ async def encode_video():
                 stderr=asyncio.subprocess.PIPE
             )
 
+            # ETA tracking
             while True:
                 await asyncio.sleep(3)  # Update every 3 seconds
                 elapsed = time.time() - start_time
-                eta = elapsed * 1.5  # Approximate ETA multiplier
+                eta = max(5, elapsed * 0.8)  # Adjusted ETA calculation
                 await progress_message.edit_text(f"🚀 **Encoding in Progress... ETA: {int(eta)}s**")
                 if video_process.returncode is not None:
                     break
 
+            stdout, stderr = await video_process.communicate()
             if video_process.returncode != 0:
-                raise RuntimeError("Video encoding failed.")
+                raise RuntimeError(f"Video encoding failed: {stderr.decode()}")
 
             await progress_message.edit_text("🚀 **Encoding Complete! Finalizing...**")
 
@@ -91,7 +93,13 @@ async def encode_video():
 
         except Exception as e:
             logger.error(f"Error during encoding: {str(e)}")
-            await progress_message.edit_text(f"❌ **Encoding Failed!**\n\n⚠️ Error: `{str(e)}`")
+            await progress_message.edit_text(
+                "❌ **Encoding Failed!**\n\n"
+                f"⚠️ Error: `{str(e)}`\n"
+                "🔄 Retrying might help or check file format."
+            )
+
+        finally:
             try:
                 if os.path.exists(file_path):
                     os.remove(file_path)
