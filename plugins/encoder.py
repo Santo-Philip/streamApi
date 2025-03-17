@@ -78,11 +78,11 @@ async def encode_video():
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE
         )
-        await video_process.communicate()
+        video_stdout, video_stderr = await video_process.communicate()
 
-        # Step 2: Process each audio stream
+        # Step 2: Process each audio stream (only up to audio_count)
         audio_playlists = []
-        for i in range(min(audio_count, len(languages))):
+        for i in range(audio_count):  # Changed to range(audio_count) to match actual streams
             audio_dir = f"{hls_dir}/audio_{i}"
             os.makedirs(audio_dir, exist_ok=True)
             # Check if audio can be copied (AAC) or needs re-encoding (e.g., Opus)
@@ -152,7 +152,7 @@ async def encode_video():
             )
             insert_video(msg, file_id, file_name, unique_id)
         else:
-            error_message = stderr.decode() if stderr else "Unknown error"
+            error_message = (video_stderr or stderr).decode() if (video_stderr or stderr) else "Unknown error"
             await progress_message.edit_text(f"❌ Encoding Failed!\n\nError: {error_message}")
             logger.error(f"FFmpeg failed: {error_message}")
 
