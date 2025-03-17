@@ -110,6 +110,7 @@ async def serve_video_player(request):
 
         hls_path = f"/hls/{video_id}/master.m3u8"
         video_title = video_details.get('title', 'Video Player')
+        logo_url = "/static/logo.png"  # Adjust this to your actual logo URL
         html_content = f"""
         <!DOCTYPE html>
         <html>
@@ -125,13 +126,11 @@ async def serve_video_player(request):
                     padding: 0; 
                     background: #000; 
                     overflow: hidden;
-                    height: 100vh;
-                    width: 100vw;
                 }}
                 .video-container {{
                     position: relative;
                     width: 100%;
-                    height: 100%;
+                    height: 100vh;
                 }}
                 .video-js {{ 
                     width: 100%; 
@@ -222,6 +221,43 @@ async def serve_video_player(request):
                     color: #ff4444;
                     text-align: center;
                 }}
+                .video-title {{
+                    position: absolute;
+                    top: 10px;
+                    left: 10px;
+                    color: #fff;
+                    font-family: Arial, sans-serif;
+                    font-size: 16px;
+                    padding: 5px 10px;
+                    background: linear-gradient(to top, rgba(0,0,0,0.9), rgba(0,0,0,0.7));
+                    border-radius: 3px;
+                    opacity: 0;
+                    z-index: 1000;
+                    transition: opacity 0.3s ease;
+                }}
+                .vjs-control-bar:not(.vjs-hidden) ~ .video-title {{
+                    opacity: 1;
+                }}
+                .seek-info {{
+                    position: absolute;
+                    top: 50%;
+                    left: 50%;
+                    transform: translate(-50%, -50%);
+                    color: #fff;
+                    font-family: Arial, sans-serif;
+                    font-size: 24px;
+                    padding: 10px 20px;
+                    background: rgba(0, 0, 0, 0.8);
+                    border-radius: 5px;
+                    opacity: 0;
+                    z-index: 1000;
+                    pointer-events: none;
+                    transition: opacity 0.3s ease, transform 0.3s ease;
+                }}
+                .seek-info.show {{
+                    opacity: 1;
+                    transform: translate(-50%, -60%);
+                }}
             </style>
         </head>
         <body>
@@ -231,6 +267,8 @@ async def serve_video_player(request):
                     Your browser does not support the video tag.
                 </video>
                 <img src="{logo_url}" class="logo" alt="Logo" onerror="this.style.display='none'">
+                <div class="video-title">{video_title}</div>
+                <div class="seek-info" id="seek-info"></div>
             </div>
             <script>
                 const player = videojs('video-player', {{
@@ -252,7 +290,8 @@ async def serve_video_player(request):
                         progressControl: {{
                             seekBar: true
                         }},
-                        audioTrackButton: true
+                        audioTrackButton: true,
+                        textTrackButton: true  // Enable subtitle menu
                     }}
                 }});
 
@@ -267,25 +306,43 @@ async def serve_video_player(request):
 
                     // Audio track handling
                     player.on('loadedmetadata', function() {{
-                        const tracks = player.audioTracks(); // 'tracks' instead of 'audioTracks' for clarity
-                        if (tracks && tracks.length > 0) {{
-                            console.log('Audio tracks available:', tracks.length);
-                            for (let index = 0; index < tracks.length; index++) {{ // 'index' instead of 'i'
-                                const audioTrack = tracks[index]; // 'audioTrack' instead of 'track'
+                        const audioTracks = player.audioTracks();
+                        if (audioTracks && audioTracks.length > 0) {{
+                            console.log('Audio tracks available:', audioTracks.length);
+                            for (let i = 0; i < audioTracks.length; i++) {{
+                                const track = audioTracks[i];
+                                console.log('Audio track:', track.label, track.enabled);
                             }}
                         }} else {{
                             console.log('No audio tracks detected');
+                        }}
+
+                        // Subtitle track handling
+                        const textTracks = player.textTracks();
+                        if (textTracks && textTracks.length > 0) {{
+                            console.log('Subtitle tracks available:', textTracks.length);
+                            for (let i = 0; i < textTracks.length; i++) {{
+                                const track = textTracks[i];
+                                console.log('Subtitle track:', track.label, track.mode);
+                                if (track.mode === 'showing') {{
+                                    track.mode = 'showing';  // Ensure default subtitle is active
+                                }}
+                            }}
+                        }} else {{
+                            console.log('No subtitle tracks detected');
                         }}
                     }});
 
                     player.audioTracks().addEventListener('change', function() {{
                         const tracks = player.audioTracks();
-                        if (tracks) {{
-                            const activeTrack = Array.from(tracks).find(function(audioTrack) {{
-                                return audioTrack.enabled;
-                            }});
-                            console.log('Switched to audio track:', activeTrack ? activeTrack.label : 'None');
-                        }}
+                        const activeTrack = Array.from(tracks).find(track => track.enabled);
+                        console.log('Switched to audio track:', activeTrack ? activeTrack.label : 'None');
+                    }});
+
+                    player.textTracks().addEventListener('change', function() {{
+                        const tracks = player.textTracks();
+                        const activeTrack = Array.from(tracks).find(track => track.mode === 'showing');
+                        console.log('Switched to subtitle track:', activeTrack ? activeTrack.label : 'None');
                     }});
                 }});
 
@@ -300,6 +357,7 @@ async def serve_video_player(request):
                     if (timeSinceLastTap < 300 && timeSinceLastTap > 0) {{
                         const seekTime = tapX < videoRect.width / 2 ? -10 : 10;
                         player.currentTime(player.currentTime() + seekTime);
+                        showSeekInfo(seekTime);
                     }}
                     lastTap = now;
                 }});
@@ -320,23 +378,41 @@ async def serve_video_player(request):
                     const deltaX = currentX - startX;
                     const duration = player.duration() || 0;
                     const seekRange = duration * (deltaX / videoRect.width);
-                    player.currentTime(Math.max(0, Math.min(duration, startTime + seekRange)));
+                    const newTime = Math.max(0, Math.min(duration, startTime + seekRange));
+                    player.currentTime(newTime);
                 }});
 
                 player.on('touchend', function() {{
+                    if (isDragging) {{
+                        const seekTime = player.currentTime() - startTime;
+                        if (Math.abs(seekTime) > 1) {{  // Show seek info only for significant drags
+                            showSeekInfo(seekTime);
+                        }}
+                    }}
                     isDragging = false;
                 }});
 
-                // Ensure logo stays above controls
+                // Seek info display function
+                function showSeekInfo(seekTime) {{
+                    const seekInfo = document.getElementById('seek-info');
+                    seekInfo.textContent = (seekTime > 0 ? '+' : '') + Math.round(seekTime) + 's';
+                    seekInfo.classList.add('show');
+                    setTimeout(() => {{
+                        seekInfo.classList.remove('show');
+                    }}, 1000);  // Hide after 1 second
+                }}
+
+                // Ensure logo and title stay above controls
                 player.on('loadedmetadata', function() {{
                     document.querySelector('.logo').style.zIndex = '1000';
+                    document.querySelector('.video-title').style.zIndex = '1000';
                 }});
             </script>
         </body>
         </html>
         """
         response = web.Response(text=html_content, content_type='text/html')
-        response.headers['X-Frame-Options'] = 'ALLOWALL'  # Allow embedding in iframes
+        response.headers['X-Frame-Options'] = 'ALLOWALL'
         return response
     except Exception as e:
         logger.error(f"Error serving video player: {str(e)}")
