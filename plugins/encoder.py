@@ -59,20 +59,24 @@ async def encode_video():
                 raise RuntimeError(f"FFmpeg not found: {ffmpeg_check.stderr}")
 
             # Probe input file for stream info
-            probe_cmd = f'ffprobe -v error -show_entries stream=index,codec_type,codec_name -of json {shlex.quote(file_path)}'
+            probe_cmd = f'ffprobe -v error -show_entries stream=index,codec_type,codec_name,sample_rate,channels -of json {shlex.quote(file_path)}'
             probe_process = subprocess.run(probe_cmd, shell=True, capture_output=True, text=True)
             if probe_process.returncode != 0:
                 raise RuntimeError(f"FFprobe failed: {probe_process.stderr}")
             probe_data = json.loads(probe_process.stdout)
             streams = probe_data['streams']
             video_codec = next((s['codec_name'] for s in streams if s['codec_type'] == 'video'), None)
-            audio_streams = [(s['index'], s['codec_name']) for s in streams if s['codec_type'] == 'audio']
+            audio_streams = [(s['index'], s['codec_name'], s.get('sample_rate', 'N/A'), s.get('channels', 'N/A'))
+                             for s in streams if s['codec_type'] == 'audio']
             subtitle_streams = [(s['index'], s['codec_name']) for s in streams if s['codec_type'] == 'subtitle']
+            logger.info(f"Video codec: {video_codec}")
+            for idx, codec, sample_rate, channels in audio_streams:
+                logger.info(f"Audio stream {idx}: codec={codec}, sample_rate={sample_rate}, channels={channels}")
             logger.info(f"Detected {len(audio_streams)} audio streams and {len(subtitle_streams)} subtitle streams")
 
             # Determine encoding settings
             video_copy = video_codec in ['h264']
-            audio_copies = [codec in ['aac'] for _, codec in audio_streams]
+            audio_copies = [codec in ['aac'] for _, codec, _, _ in audio_streams]
             video_cmd_parts = [f'ffmpeg -hide_banner -y -i {shlex.quote(file_path)}']
 
             # Video mapping
@@ -84,18 +88,20 @@ async def encode_video():
 
             # Audio mapping
             audio_map = []
-            for i, (idx, codec) in enumerate(audio_streams):
+            for i, (idx, codec, sample_rate, channels) in enumerate(audio_streams):
                 audio_map.append(f"a:{i}")
                 video_cmd_parts.append(f'-map 0:a:{i}')
                 if codec in ['aac']:
                     video_cmd_parts.append(f'-c:a:{i} copy')
                 else:
-                    video_cmd_parts.append(f'-c:a:{i} aac')
+                    video_cmd_parts.append(
+                        f'-c:a:{i} aac -profile:a:{i} aac_low -ar:a:{i} 44100 -ac:a:{i} 2')  # AAC-LC, 44.1kHz, stereo
 
             # HLS settings
             video_cmd_parts.extend([
                 '-hls_time 5 -hls_list_size 0 -f hls',
-                f'-var_stream_map "v:0 {",".join(audio_map)}"',
+                f'-var_stream_map "v:0,name:video {",".join(f"a:{i},name:audio{i}" for i in range(len(audio_streams)))}"',
+                '-hls_segment_type mpegts',  # Ensure MPEG-TS segments
                 f'-master_pl_name master.m3u8',
                 f'-hls_segment_filename {shlex.quote(f"{hls_dir}/v%v/segment%d.ts")}',
                 f'{shlex.quote(f"{hls_dir}/v%v/playlist.m3u8")}'
@@ -110,7 +116,7 @@ async def encode_video():
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 text=True,
-                bufsize=1,  # Line-buffered
+                bufsize=1,
                 universal_newlines=True
             )
 
@@ -118,9 +124,8 @@ async def encode_video():
                 duration = None
                 last_update = 0
                 stderr_output = []
-                last_progress = -1  # Track last progress to avoid duplicates
+                last_progress = -1
 
-                # Read stderr for progress
                 while process.poll() is None:
                     line = process.stderr.readline().strip()
                     if line:
@@ -136,7 +141,7 @@ async def encode_video():
                             h, m, s = map(float, time_str.split(":"))
                             processed_time = h * 3600 + m * 60 + s
                             progress = min(100, int((processed_time / duration) * 100))
-                            if current_time - last_update >= 3 and progress != last_progress:  # Update every 3s if changed
+                            if current_time - last_update >= 3 and progress != last_progress:
                                 bar = "█" * (progress // 10) + "-" * (10 - progress // 10)
                                 try:
                                     await progress_message.edit_text(
@@ -144,10 +149,10 @@ async def encode_video():
                                     last_update = current_time
                                     last_progress = progress
                                 except MessageNotModified:
-                                    pass  # Ignore if the message hasn't changed
-                        elif current_time - start_time > 1 and current_time - last_update >= 3:  # Fallback for copy
+                                    pass
+                        elif current_time - start_time > 1 and current_time - last_update >= 3:
                             elapsed = current_time - start_time
-                            progress = min(100, int((elapsed / 10) * 100))  # Assume 10s for copy
+                            progress = min(100, int((elapsed / 10) * 100))
                             if progress != last_progress:
                                 bar = "█" * (progress // 10) + "-" * (10 - progress // 10)
                                 try:
@@ -157,26 +162,22 @@ async def encode_video():
                                     last_progress = progress
                                 except MessageNotModified:
                                     pass
-                    await asyncio.sleep(0.1)  # Prevent tight loop
+                    await asyncio.sleep(0.1)
 
-                # Read remaining stderr and stdout
                 stderr_remaining = process.stderr.read()
                 if stderr_remaining:
                     stderr_output.append(stderr_remaining.strip())
                 stdout_output = process.stdout.read().strip()
 
-                # Check return code
                 return_code = process.wait()
                 if return_code != 0:
                     error_msg = "\n".join(stderr_output) if stderr_output else "Unknown FFmpeg error"
                     raise RuntimeError(f"Video/audio processing failed: {error_msg}")
 
-                # Final progress update
                 if last_progress != 100:
                     await progress_message.edit_text(f"{base_message}\n⏳ **Progress:** [██████████] 100%")
                 return stdout_output, "\n".join(stderr_output)
 
-            # Run FFmpeg and monitor output
             progress_task = asyncio.create_task(process_ffmpeg_output())
             stdout, stderr = await progress_task
             logger.info(f"FFmpeg stdout: {stdout}")
@@ -204,12 +205,20 @@ async def encode_video():
             if not os.path.exists(master_file):
                 raise FileNotFoundError(f"Master playlist not generated: {master_file}")
 
-            with open(master_file, 'a') as f:
+            with open(master_file, 'r') as f:
+                master_content = f.read()
+            logger.info(f"Master playlist content:\n{master_content}")
+
+            with open(master_file, 'w') as f:
+                f.write('#EXTM3U\n#EXT-X-VERSION:3\n')
+                for idx in range(len(audio_streams)):
+                    f.write(
+                        f'#EXT-X-MEDIA:TYPE=AUDIO,GROUP-ID="audio",NAME="Audio {idx}",DEFAULT={"YES" if idx == 0 else "NO"},URI="v{audio_map[idx].split(":")[1]}/playlist.m3u8"\n')
                 for idx in range(len(subtitle_streams)):
                     if os.path.exists(f"{subtitle_subdir}/sub_{idx}.vtt"):
                         f.write(
-                            f'#EXT-X-MEDIA:TYPE=SUBTITLES,GROUP-ID="subs",NAME="Subtitle {idx}",URI="../subtitles/sub_{idx}.vtt"\n')
-                f.write('#EXT-X-STREAM-INF:BANDWIDTH=5000000,RESOLUTION=1280x720,SUBTITLES="subs"\n')
+                            f'#EXT-X-MEDIA:TYPE=SUBTITLES,GROUP-ID="subs",NAME="Subtitle {idx}",DEFAULT={"YES" if idx == 0 else "NO"},URI="../subtitles/sub_{idx}.vtt"\n')
+                f.write('#EXT-X-STREAM-INF:BANDWIDTH=5000000,AUDIO="audio",SUBTITLES="subs"\n')
                 f.write('v0/playlist.m3u8\n')
 
             logger.info("Processing completed successfully")
