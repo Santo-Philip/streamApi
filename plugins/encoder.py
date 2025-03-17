@@ -7,7 +7,6 @@ import time
 from database.video import insert_video
 from plugins.video import que
 
-# Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -21,7 +20,7 @@ async def encode_video():
         file_id = video_data["file_id"]
         progress_message = video_data['progress']
         msg = video_data['msg']
-
+        unique_id = str(uuid.uuid4())
         file_path = os.path.abspath(file_path)
         hls_dir = f"downloads/{file_id}"
         video_subdir = f"{hls_dir}/video"
@@ -102,10 +101,9 @@ async def encode_video():
 
             await progress_message.edit_text(f"{base_message}\n⏳ **Progress:** [██████████] 100%\n🚀 **Encoding Complete! Finalizing...**")
 
-            # Insert into database using file_id
             file_size = os.path.getsize(file_path)
             logger.info(f"Inserting video data into database: {file_id}, {file_name}, {file_id}")
-            insert_video(msg, file_id, file_name, file_id)  # Using file_id as unique_id
+            insert_video(msg, file_id, file_name, unique_id)  # Using file_id as unique_id
 
             await progress_message.edit_text(
                 f"{base_message}\n"
@@ -113,7 +111,7 @@ async def encode_video():
                 "✨ **Encoding Complete! 🎬**\n\n"
                 f"**📌 Filename:** `{file_name}`\n"
                 f"**💾 Size:** `{round(file_size / (1024 * 1024), 2)} MB`\n"
-                f"**🔗 Stream Now:** [Watch Here](https://media.mehub.in/video/{file_id})\n\n"
+                f"**🔗 Stream Now:** [Watch Here](https://media.mehub.in/video/{unique_id})\n\n"
                 "🚀 **Enjoy your video!** 🎉"
             )
 
