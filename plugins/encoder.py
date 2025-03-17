@@ -5,6 +5,8 @@ import logging
 import uuid
 from database.video import insert_video
 from plugins.video import que
+
+# Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -48,42 +50,16 @@ async def encode_video():
             que.task_done()
             continue
 
-        # Get audio track count
-        process = await asyncio.create_subprocess_shell(
-            f'ffmpeg -i "{file_path}" -f null -',
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE
+        # FFmpeg command to use only the default audio track
+        cmd = (
+            f'ffmpeg -hide_banner -y -i "{file_path}" '
+            f'-map 0:v -map 0:a:0 '  # Map video and only the default audio track
+            f'-c:v libx264 -c:a aac -b:a 192k '  # Re-encode to H.264/AAC
+            f'-hls_time 5 -hls_list_size 0 '
+            f'-hls_segment_filename "{hls_dir}/segment%d.ts" '
+            f'-progress pipe:1 '
+            f'"{hls_dir}/output.m3u8"'
         )
-        _, stderr = await process.communicate()
-        audio_count = stderr.decode().count("Audio:")
-        languages = ["eng", "spa", "fre", "ger", "ita"]
-
-        # Build FFmpeg command based on audio track count
-        if audio_count > 1:
-            # Multiple audio tracks: use variant streams
-            var_stream_map = " ".join(f"v:0,a:{i},name:{languages[i]}" for i in range(min(audio_count, len(languages))))
-            cmd = (
-                f'ffmpeg -hide_banner -y -i "{file_path}" '
-                f'-map 0:v -map 0:a '
-                f'-c:v libx264 -c:a aac -b:a 192k '
-                f'-var_stream_map "{var_stream_map}" '
-                f'-master_pl_name master.m3u8 '
-                f'-hls_time 5 -hls_list_size 0 '
-                f'-hls_segment_filename "{hls_dir}/v%v/segment%d.ts" '
-                f'-progress pipe:1 '
-                f'"{hls_dir}/v%v/output.m3u8"'
-            )
-        else:
-            # Single audio track: simplify to one HLS stream
-            cmd = (
-                f'ffmpeg -hide_banner -y -i "{file_path}" '
-                f'-map 0:v -map 0:a:0 '  # Explicitly map the first audio track
-                f'-c:v libx264 -c:a aac -b:a 192k '
-                f'-hls_time 5 -hls_list_size 0 '
-                f'-progress pipe:1 '
-                f'"{hls_dir}/output.m3u8"'
-            )
-
         logger.info(f"Running FFmpeg command: {cmd}")
 
         process = await asyncio.create_subprocess_shell(
@@ -95,11 +71,7 @@ async def encode_video():
         # Progress tracking
         while process.returncode is None:
             await asyncio.sleep(2)
-            target_dir = f"{hls_dir}/v0" if audio_count > 1 else hls_dir
-            if os.path.exists(target_dir):
-                ts_files = [f for f in os.listdir(target_dir) if f.endswith(".ts")]
-            else:
-                ts_files = [f for f in os.listdir(hls_dir) if f.endswith(".ts")]
+            ts_files = [f for f in os.listdir(hls_dir) if f.endswith(".ts")]
             segment_count = len(ts_files)
             progress = min(100, int((segment_count / 100) * 100))  # Adjust divisor if needed
             bar = "█" * (progress // 5) + " " * (20 - (progress // 5))
