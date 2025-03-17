@@ -111,7 +111,6 @@ async def serve_video_player(request):
 
         hls_path = f"/hls/{video_id}/master.m3u8"  # Use master playlist for multi-audio
         video_title = video_details.get('title', 'Video Player')
-        logo_url = os.getenv("LOGO_URL", "https://example.com/default-logo.png")
 
         # Note: The following JavaScript uses 'i' and 'track', which are valid in JS scope
         html_content = f"""

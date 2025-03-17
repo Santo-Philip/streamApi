@@ -6,7 +6,6 @@ import uuid
 from database.video import insert_video
 from plugins.video import que
 
-# Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -97,8 +96,7 @@ async def encode_video():
             master_playlist = "#EXTM3U\n#EXT-X-VERSION:3\n"
             for i, audio in enumerate(audio_playlists):
                 master_playlist += (
-                    f'#EXT-X-MEDIA:TYPE=AUDIO,GROUP-ID="audio",NAME="Track {i + 1}",DEFAULT={"YES" if i == 0 else "NO"},AUTOSELECT=YES,URI="{audio}"
-                    '
+                    f'#EXT-X-MEDIA:TYPE=AUDIO,GROUP-ID="audio",NAME="Track {i + 1}",DEFAULT={"YES" if i == 0 else "NO"},AUTOSELECT=YES,URI="{audio}"'
                 )
             master_playlist += f'#EXT-X-STREAM-INF:BANDWIDTH=2000000,AUDIO="audio"\nvideo/output.m3u8\n'
 
