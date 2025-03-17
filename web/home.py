@@ -92,7 +92,6 @@ async def serve_hls(request):
 
 
 async def serve_video_player(request):
-    """Serve the video player page with HLS stream for embedding"""
     try:
         token = request.match_info.get('token')
         if not token:
@@ -109,10 +108,8 @@ async def serve_video_player(request):
             logger.warning(f"Video ID not found in details for token: {token}")
             return web.Response(text="Video ID not found in details", status=404)
 
-        hls_path = f"/hls/{video_id}/master.m3u8"  # Use master playlist for multi-audio
+        hls_path = f"/hls/{video_id}/master.m3u8"
         video_title = video_details.get('title', 'Video Player')
-
-        # Note: The following JavaScript uses 'i' and 'track', which are valid in JS scope
         html_content = f"""
         <!DOCTYPE html>
         <html>
