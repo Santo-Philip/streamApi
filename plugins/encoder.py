@@ -6,6 +6,7 @@ import uuid
 from database.video import insert_video
 from plugins.video import que
 
+# Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -49,43 +50,98 @@ async def encode_video():
             que.task_done()
             continue
 
-        # FFmpeg command: Copy video, re-encode only default audio
-        cmd = (
-            f'ffmpeg -hide_banner -y -i "{file_path}" '
-            f'-map 0:v -map 0:a:0 '  # Map video and default audio
-            f'-c:v copy -c:a aac -b:a 128k '  # Copy video, re-encode audio to AAC
-            f'-preset ultrafast -threads 0 '  # Optimize speed
-            f'-hls_time 5 -hls_list_size 0 '
-            f'-hls_segment_filename "{hls_dir}/segment%d.ts" '
-            f'-progress pipe:1 '
-            f'"{hls_dir}/output.m3u8"'
-        )
-        logger.info(f"Running FFmpeg command: {cmd}")
-
+        # Get audio track info
         process = await asyncio.create_subprocess_shell(
-            cmd,
+            f'ffmpeg -i "{file_path}" -f null -',
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE
         )
+        _, stderr = await process.communicate()
+        stderr_str = stderr.decode()
+        audio_count = stderr_str.count("Audio:")
+        languages = ["eng", "spa", "fre", "ger", "ita"]
+        is_aac = "aac" in stderr_str.lower()  # Check if any audio is AAC
 
-        # Progress tracking
-        while process.returncode is None:
+        # Step 1: Copy video stream
+        video_cmd = (
+            f'ffmpeg -hide_banner -y -i "{file_path}" '
+            f'-map 0:v -c:v copy '
+            f'-an '  # No audio in video stream
+            f'-hls_time 5 -hls_list_size 0 '
+            f'-hls_segment_filename "{hls_dir}/video/segment%d.ts" '
+            f'-progress pipe:1 '
+            f'"{hls_dir}/video/output.m3u8"'
+        )
+        logger.info(f"Running video FFmpeg command: {video_cmd}")
+        video_process = await asyncio.create_subprocess_shell(
+            video_cmd,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE
+        )
+        await video_process.communicate()
+
+        # Step 2: Process each audio stream
+        audio_playlists = []
+        for i in range(min(audio_count, len(languages))):
+            audio_dir = f"{hls_dir}/audio_{i}"
+            os.makedirs(audio_dir, exist_ok=True)
+            # Check if audio can be copied (AAC) or needs re-encoding (e.g., Opus)
+            audio_cmd = (
+                f'ffmpeg -hide_banner -y -i "{file_path}" '
+                f'-map 0:a:{i} '
+                f'-c:a {"copy" if is_aac else "aac"} -b:a 128k '
+                f'-vn '  # No video in audio stream
+                f'-hls_time 5 -hls_list_size 0 '
+                f'-hls_segment_filename "{audio_dir}/segment%d.ts" '
+                f'-progress pipe:1 '
+                f'"{audio_dir}/output.m3u8"'
+            )
+            logger.info(f"Running audio FFmpeg command {i}: {audio_cmd}")
+            audio_process = await asyncio.create_subprocess_shell(
+                audio_cmd,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE
+            )
+            stdout, stderr = await audio_process.communicate()
+            if audio_process.returncode == 0:
+                audio_playlists.append((i, languages[i], audio_dir))
+            else:
+                logger.error(f"Audio {i} failed: {stderr.decode()}")
+
+        # Step 3: Generate master playlist
+        master_playlist = "#EXTM3U\n#EXT-X-VERSION:3\n"
+        for i, lang, audio_dir in audio_playlists:
+            default = "YES" if i == 0 else "NO"  # First audio as default
+            master_playlist += (
+                f'#EXT-X-MEDIA:TYPE=AUDIO,GROUP-ID="audio",NAME="{lang.capitalize()}",'
+                f'LANGUAGE="{lang}",DEFAULT={default},AUTOSELECT=YES,URI="audio_{i}/output.m3u8"\n'
+            )
+        master_playlist += (
+            f'#EXT-X-STREAM-INF:BANDWIDTH=2000000,AUDIO="audio"\n'
+            f'video/output.m3u8\n'
+        )
+
+        # Write master playlist
+        master_path = f"{hls_dir}/master.m3u8"
+        with open(master_path, "w") as f:
+            f.write(master_playlist)
+
+        # Progress tracking (simplified to video completion)
+        while video_process.returncode is None:
             await asyncio.sleep(2)
-            ts_files = [f for f in os.listdir(hls_dir) if f.endswith(".ts")]
+            ts_files = [f for f in os.listdir(f"{hls_dir}/video") if f.endswith(".ts")]
             segment_count = len(ts_files)
-            progress = min(100, int((segment_count / 100) * 100))  # Adjust divisor if needed
+            progress = min(100, int((segment_count / 100) * 100))
             bar = "█" * (progress // 5) + " " * (20 - (progress // 5))
             try:
                 await progress_message.edit_text(f"🚀 Encoding... \n\n[{bar}] {progress}%")
             except Exception:
                 pass
 
-        stdout, stderr = await process.communicate()
-        return_code = process.returncode
-
-        unique_id = str(uuid.uuid4())
-        if return_code == 0:
+        # Check overall success
+        if video_process.returncode == 0 and audio_playlists:
             file_size = os.path.getsize(file_path)
+            unique_id = str(uuid.uuid4())
             await progress_message.edit_text(
                 "✨ **Encoding Masterpiece Complete!** 🎉\n\n"
                 "📊 **Progress:** `[███████████]` **100%**\n"
@@ -98,7 +154,7 @@ async def encode_video():
         else:
             error_message = stderr.decode() if stderr else "Unknown error"
             await progress_message.edit_text(f"❌ Encoding Failed!\n\nError: {error_message}")
-            logger.error(f"FFmpeg failed with code {return_code}: {error_message}")
+            logger.error(f"FFmpeg failed: {error_message}")
 
             # Cleanup on failure
             try:
