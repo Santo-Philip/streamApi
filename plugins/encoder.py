@@ -40,7 +40,7 @@ async def encode_video():
             continue
 
         logger.info(f"Encoding file: {file_path}")
-        await progress_message.edit_text("🚀 **Encoding Started... [0%]**")
+        await progress_message.edit_text("🚀 **Encoding Started... [----------] 0%**")
         start_time = time.time()
 
         try:
@@ -68,12 +68,16 @@ async def encode_video():
                 stderr=asyncio.subprocess.PIPE
             )
 
-            # Progress update task
+            # Progress bar update task (simulated progress)
             async def update_progress():
+                # Simulate progress based on elapsed time (adjust ESTIMATED_DURATION as needed)
+                ESTIMATED_DURATION = 60  # Placeholder: estimate encoding time in seconds
                 while video_process.returncode is None:
                     await asyncio.sleep(3)
                     elapsed = time.time() - start_time
-                    await progress_message.edit_text(f"🚀 **Encoding in Progress... [{int(elapsed)}s elapsed]**")
+                    progress = min(100, int((elapsed / ESTIMATED_DURATION) * 100))
+                    bar = "█" * (progress // 10) + "-" * (10 - progress // 10)
+                    await progress_message.edit_text(f"🚀 **Encoding in Progress... [{bar}] {progress}%**")
 
             asyncio.create_task(update_progress())
             stdout, stderr = await video_process.communicate()
@@ -88,6 +92,11 @@ async def encode_video():
             unique_id = str(uuid.uuid4())
             insert_video(msg, file_id, file_name, unique_id)
 
+            # Move HLS files to a permanent location (e.g., 'streams' directory)
+            stream_dir = f"streams/{unique_id}"
+            os.makedirs(stream_dir, exist_ok=True)
+            shutil.move(hls_dir, stream_dir)
+
             await progress_message.edit_text(
                 "✨ **Encoding Complete! 🎬**\n\n"
                 f"**📌 Filename:** `{file_name}`\n"
@@ -96,11 +105,9 @@ async def encode_video():
                 "🚀 **Enjoy your video!** 🎉"
             )
 
-            # Cleanup after success
+            # Optional: Clean up original file only (keep HLS files for streaming)
             if os.path.exists(file_path):
                 os.remove(file_path)
-            if os.path.exists(hls_dir):
-                shutil.rmtree(hls_dir, ignore_errors=True)
 
         except Exception as e:
             logger.error(f"Error during encoding: {str(e)}")
@@ -109,5 +116,10 @@ async def encode_video():
                 f"⚠️ Error: `{str(e)}`\n"
                 "🔄 Retrying might help or check file format."
             )
+            # Clean up on failure
+            if os.path.exists(hls_dir):
+                shutil.rmtree(hls_dir, ignore_errors=True)
+            if os.path.exists(file_path):
+                os.remove(file_path)
 
         que.task_done()
