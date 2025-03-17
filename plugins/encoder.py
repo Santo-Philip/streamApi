@@ -93,7 +93,7 @@ async def encode_video():
             logger.info("Encoding completed successfully")
 
             # Check HLS output
-            output_file = f"{hls_dir}/video/output.m3u8"
+            output_file = f"{hls_dir}/output.m3u8"
             if not os.path.exists(output_file):
                 logger.error(f"HLS output missing: {output_file}")
                 raise FileNotFoundError(f"HLS output not generated: {output_file}")
