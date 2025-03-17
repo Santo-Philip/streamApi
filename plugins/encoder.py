@@ -6,9 +6,7 @@ import uuid
 import time
 import shlex
 import json
-
-from pyrogram.errors import MessageNotModified
-
+import subprocess
 from database.video import insert_video
 from plugins.video import que
 
@@ -17,6 +15,7 @@ logger = logging.getLogger(__name__)
 
 
 async def encode_video():
+    global progress_task
     while True:
         video_data = await que.get()
         file_path = video_data["file_path"]
@@ -55,26 +54,16 @@ async def encode_video():
 
         try:
             # Check FFmpeg
-            ffmpeg_check = await asyncio.create_subprocess_shell(
-                "ffmpeg -version",
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE
-            )
-            stdout, stderr = await ffmpeg_check.communicate()
+            ffmpeg_check = subprocess.run("ffmpeg -version", shell=True, capture_output=True, text=True)
             if ffmpeg_check.returncode != 0:
-                raise RuntimeError(f"FFmpeg not found: {stderr.decode()}")
+                raise RuntimeError(f"FFmpeg not found: {ffmpeg_check.stderr}")
 
             # Probe input file for stream info
             probe_cmd = f'ffprobe -v error -show_entries stream=index,codec_type,codec_name -of json {shlex.quote(file_path)}'
-            probe_process = await asyncio.create_subprocess_shell(
-                probe_cmd,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE
-            )
-            probe_stdout, probe_stderr = await probe_process.communicate()
+            probe_process = subprocess.run(probe_cmd, shell=True, capture_output=True, text=True)
             if probe_process.returncode != 0:
-                raise RuntimeError(f"FFprobe failed: {probe_stderr.decode()}")
-            probe_data = json.loads(probe_stdout.decode())
+                raise RuntimeError(f"FFprobe failed: {probe_process.stderr}")
+            probe_data = json.loads(probe_process.stdout)
             streams = probe_data['streams']
             video_codec = next((s['codec_name'] for s in streams if s['codec_type'] == 'video'), None)
             audio_streams = [(s['index'], s['codec_name']) for s in streams if s['codec_type'] == 'audio']
@@ -113,34 +102,36 @@ async def encode_video():
             ])
             video_cmd = ' '.join(video_cmd_parts)
             logger.info(f"Running FFmpeg video/audio command: {video_cmd}")
-            video_process = await asyncio.create_subprocess_shell(
+
+            # Run FFmpeg with subprocess.Popen
+            process = subprocess.Popen(
                 video_cmd,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE
+                shell=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                bufsize=1,  # Line-buffered
+                universal_newlines=True
             )
 
             async def process_ffmpeg_output():
                 duration = None
                 last_update = 0
                 stderr_output = []
-                stdout_output = []
 
                 # Read stderr for progress
-                while True:
-                    line = await video_process.stderr.readline()
-                    if not line and video_process.returncode is not None:
-                        break
+                while process.poll() is None:
+                    line = process.stderr.readline().strip()
                     if line:
-                        stderr_line = line.decode().strip()
-                        stderr_output.append(stderr_line)
-                        if "Duration" in stderr_line and not duration:
-                            parts = stderr_line.split("Duration: ")[1].split(",")[0]
+                        stderr_output.append(line)
+                        if "Duration" in line and not duration:
+                            parts = line.split("Duration: ")[1].split(",")[0]
                             h, m, s = map(float, parts.split(":"))
                             duration = h * 3600 + m * 60 + s
                             logger.info(f"Detected duration: {duration} seconds")
                         current_time = time.time()
-                        if "time=" in stderr_line and duration:
-                            time_str = stderr_line.split("time=")[1].split(" ")[0]
+                        if "time=" in line and duration:
+                            time_str = line.split("time=")[1].split(" ")[0]
                             h, m, s = map(float, time_str.split(":"))
                             processed_time = h * 3600 + m * 60 + s
                             progress = min(100, int((processed_time / duration) * 100))
@@ -154,23 +145,23 @@ async def encode_video():
                             bar = "█" * (progress // 10) + "-" * (10 - progress // 10)
                             await progress_message.edit_text(f"{base_message}\n⏳ **Progress:** [{bar}] {progress}%")
                             last_update = current_time
+                    await asyncio.sleep(0.1)  # Prevent tight loop
 
-                # Read remaining stdout
-                while True:
-                    line = await video_process.stdout.readline()
-                    if not line:
-                        break
-                    stdout_output.append(line.decode().strip())
+                # Read remaining stderr and stdout
+                stderr_remaining = process.stderr.read()
+                if stderr_remaining:
+                    stderr_output.append(stderr_remaining.strip())
+                stdout_output = process.stdout.read().strip()
 
-                # Wait for process to complete and check return code
-                await video_process.wait()
-                if video_process.returncode != 0:
+                # Check return code
+                return_code = process.wait()
+                if return_code != 0:
                     error_msg = "\n".join(stderr_output) if stderr_output else "Unknown FFmpeg error"
                     raise RuntimeError(f"Video/audio processing failed: {error_msg}")
 
                 # Final progress update
                 await progress_message.edit_text(f"{base_message}\n⏳ **Progress:** [██████████] 100%")
-                return "\n".join(stdout_output), "\n".join(stderr_output)
+                return stdout_output, "\n".join(stderr_output)
 
             # Run FFmpeg and monitor output
             progress_task = asyncio.create_task(process_ffmpeg_output())
@@ -186,14 +177,14 @@ async def encode_video():
                     f'{shlex.quote(f"{subtitle_subdir}/sub_{idx}.vtt")}'
                 )
                 logger.info(f"Extracting subtitle {idx}: {sub_cmd}")
-                sub_process = await asyncio.create_subprocess_shell(
+                sub_process = subprocess.run(
                     sub_cmd,
-                    stdout=asyncio.subprocess.PIPE,
-                    stderr=asyncio.subprocess.PIPE
+                    shell=True,
+                    capture_output=True,
+                    text=True
                 )
-                sub_stdout, sub_stderr = await sub_process.communicate()
                 if sub_process.returncode != 0:
-                    logger.warning(f"Subtitle {idx} extraction failed: {sub_stderr.decode()}")
+                    logger.warning(f"Subtitle {idx} extraction failed: {sub_process.stderr}")
 
             # Update master playlist with subtitles
             master_file = f"{hls_dir}/master.m3u8"
@@ -228,8 +219,7 @@ async def encode_video():
 
             logger.info(f"Keeping original file: {file_path}")
             logger.info(f"HLS files retained in: {hls_dir}")
-        except MessageNotModified as s:
-            print(s)
+
         except Exception as e:
             logger.error(f"Error during processing: {str(e)}")
             if 'progress_task' in locals():
