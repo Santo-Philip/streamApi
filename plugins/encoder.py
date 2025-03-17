@@ -62,16 +62,16 @@ async def encode_video():
                 f'-hls_segment_filename "{video_subdir}/segment%d.ts" '
                 f'"{hls_dir}/video/output.m3u8"'
             )
+            logger.info(f"Running FFmpeg command: {video_cmd}")
             video_process = await asyncio.create_subprocess_shell(
                 video_cmd,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE
             )
 
-            # Progress bar update task (simulated progress)
+            # Progress bar update task
             async def update_progress():
-                # Simulate progress based on elapsed time (adjust ESTIMATED_DURATION as needed)
-                ESTIMATED_DURATION = 60  # Placeholder: estimate encoding time in seconds
+                ESTIMATED_DURATION = 60  # Adjust based on typical video length
                 while video_process.returncode is None:
                     await asyncio.sleep(3)
                     elapsed = time.time() - start_time
@@ -86,16 +86,21 @@ async def encode_video():
             if video_process.returncode != 0:
                 raise RuntimeError(f"Video encoding failed: {stderr.decode()}")
 
+            logger.info("Encoding completed successfully")
             await progress_message.edit_text("🚀 **Encoding Complete! Finalizing...**")
 
-            file_size = os.path.getsize(file_path)
+            # Move HLS files to permanent location
             unique_id = str(uuid.uuid4())
-            insert_video(msg, file_id, file_name, unique_id)
-
-            # Move HLS files to a permanent location (e.g., 'streams' directory)
             stream_dir = f"streams/{unique_id}"
             os.makedirs(stream_dir, exist_ok=True)
+            logger.info(f"Moving {hls_dir} to {stream_dir}")
             shutil.move(hls_dir, stream_dir)
+            logger.info(f"Files moved to {stream_dir}")
+
+            # Insert into database after encoding and file movement
+            file_size = os.path.getsize(file_path)
+            logger.info(f"Inserting video data into database: {file_id}, {file_name}, {unique_id}")
+            insert_video(msg, file_id, file_name, unique_id)
 
             await progress_message.edit_text(
                 "✨ **Encoding Complete! 🎬**\n\n"
@@ -105,8 +110,9 @@ async def encode_video():
                 "🚀 **Enjoy your video!** 🎉"
             )
 
-            # Optional: Clean up original file only (keep HLS files for streaming)
+            # Clean up original file only
             if os.path.exists(file_path):
+                logger.info(f"Removing original file: {file_path}")
                 os.remove(file_path)
 
         except Exception as e:
@@ -118,8 +124,10 @@ async def encode_video():
             )
             # Clean up on failure
             if os.path.exists(hls_dir):
+                logger.info(f"Cleaning up failed HLS dir: {hls_dir}")
                 shutil.rmtree(hls_dir, ignore_errors=True)
             if os.path.exists(file_path):
+                logger.info(f"Cleaning up failed file: {file_path}")
                 os.remove(file_path)
 
         que.task_done()
