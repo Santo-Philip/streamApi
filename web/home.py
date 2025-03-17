@@ -109,9 +109,11 @@ async def serve_video_player(request):
             logger.warning(f"Video ID not found in details for token: {token}")
             return web.Response(text="Video ID not found in details", status=404)
 
-        hls_path = f"/hls/{video_id}/output.m3u8"
+        hls_path = f"/hls/{video_id}/master.m3u8"  # Use master playlist for multi-audio
         video_title = video_details.get('title', 'Video Player')
+        logo_url = os.getenv("LOGO_URL", "https://example.com/default-logo.png")
 
+        # Note: The following JavaScript uses 'i' and 'track', which are valid in JS scope
         html_content = f"""
         <!DOCTYPE html>
         <html>
@@ -191,14 +193,34 @@ async def serve_video_player(request):
                 .vjs-button > .vjs-icon-placeholder:before {{
                     color: #fff;
                 }}
+                .vjs-menu-button-popup .vjs-menu .vjs-menu-content {{
+                    background-color: rgba(0, 0, 0, 0.8);
+                    color: #fff;
+                }}
+                .vjs-menu-button-popup .vjs-menu .vjs-menu-item:hover {{
+                    background-color: #ff416c;
+                }}
                 .logo {{
                     position: absolute;
-                    top: 5px;
-                    right: 5px;
-                    width: 50px;
+                    top: 1vw;
+                    right: 1vw;
+                    width: 5vw;
+                    max-width: 50px;
+                    min-width: 20px;
                     opacity: 0.5;
                     pointer-events: none;
                     z-index: 1000;
+                    transition: opacity 0.3s ease;
+                }}
+                .logo:hover {{
+                    opacity: 0.8;
+                }}
+                @media (max-width: 600px) {{
+                    .logo {{
+                        top: 0.5vw;
+                        right: 0.5vw;
+                        width: 6vw;
+                    }}
                 }}
                 .vjs-error-display {{
                     color: #ff4444;
@@ -218,6 +240,11 @@ async def serve_video_player(request):
                 const player = videojs('video-player', {{
                     fluid: true,
                     responsive: true,
+                    html5: {{
+                        hls: {{
+                            enableLowInitialPlaylist: true
+                        }}
+                    }},
                     controlBar: {{
                         volumePanel: {{ inline: true }},
                         fullscreenToggle: true,
@@ -228,21 +255,47 @@ async def serve_video_player(request):
                         remainingTimeDisplay: false,
                         progressControl: {{
                             seekBar: true
-                        }}
+                        }},
+                        audioTrackButton: true
                     }}
                 }});
 
-                player.on('error', () => {{
+                player.on('error', function() {{
                     player.errorDisplay.open();
                 }});
 
-                player.ready(() => {{
-                    player.play().catch(err => console.log('Autoplay failed:', err));
+                player.ready(function() {{
+                    player.play().catch(function(err) {{
+                        console.log('Autoplay failed:', err);
+                    }});
+
+                    // Audio track handling
+                    player.on('loadedmetadata', function() {{
+                        const tracks = player.audioTracks(); // 'tracks' instead of 'audioTracks' for clarity
+                        if (tracks && tracks.length > 0) {{
+                            console.log('Audio tracks available:', tracks.length);
+                            for (let index = 0; index < tracks.length; index++) {{ // 'index' instead of 'i'
+                                const audioTrack = tracks[index]; // 'audioTrack' instead of 'track'
+                            }}
+                        }} else {{
+                            console.log('No audio tracks detected');
+                        }}
+                    }});
+
+                    player.audioTracks().addEventListener('change', function() {{
+                        const tracks = player.audioTracks();
+                        if (tracks) {{
+                            const activeTrack = Array.from(tracks).find(function(audioTrack) {{
+                                return audioTrack.enabled;
+                            }});
+                            console.log('Switched to audio track:', activeTrack ? activeTrack.label : 'None');
+                        }}
+                    }});
                 }});
 
                 // Double-tap to seek
                 let lastTap = 0;
-                player.on('touchend', (e) => {{
+                player.on('touchend', function(e) {{
                     const now = Date.now();
                     const timeSinceLastTap = now - lastTap;
                     const videoRect = player.el().getBoundingClientRect();
@@ -258,13 +311,13 @@ async def serve_video_player(request):
                 // Drag to seek on video
                 let isDragging = false;
                 let startX, startTime;
-                player.on('touchstart', (e) => {{
+                player.on('touchstart', function(e) {{
                     isDragging = true;
                     startX = e.touches[0].clientX;
                     startTime = player.currentTime();
                 }});
 
-                player.on('touchmove', (e) => {{
+                player.on('touchmove', function(e) {{
                     if (!isDragging) return;
                     const videoRect = player.el().getBoundingClientRect();
                     const currentX = e.touches[0].clientX;
@@ -274,12 +327,12 @@ async def serve_video_player(request):
                     player.currentTime(Math.max(0, Math.min(duration, startTime + seekRange)));
                 }});
 
-                player.on('touchend', () => {{
+                player.on('touchend', function() {{
                     isDragging = false;
                 }});
 
                 // Ensure logo stays above controls
-                player.on('loadedmetadata', () => {{
+                player.on('loadedmetadata', function() {{
                     document.querySelector('.logo').style.zIndex = '1000';
                 }});
             </script>

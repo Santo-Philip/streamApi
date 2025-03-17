@@ -1,15 +1,19 @@
 import asyncio
 import logging
+import os
+
 from pyrogram import Client, idle, filters
 from plugins.encoder import encode_video
 from web.initial import start_web_server
+from dotenv import load_dotenv
+load_dotenv()
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
 
 api_id = 1474940
 api_hash = "779e8d2b32ef76d0b7a11fb5f132a6b6"
-bot_token = "8157992076:AAHHYL80KUSbMhcoeQI3hEUOazqaqxly_yU"
+bot_token = os.getenv('BOT_TOKEN')
 
 # Initialize Pyrogram client
 app = Client(

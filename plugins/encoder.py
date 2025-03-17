@@ -3,10 +3,8 @@ import os
 import shutil
 import logging
 import uuid
-
 from database.video import insert_video
 from plugins.video import que
-
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -32,7 +30,6 @@ async def encode_video():
 
         await progress_message.edit_text("🚀 Encoding Started... [0%]")
 
-        # Check if FFmpeg is installed
         ffmpeg_check = await asyncio.create_subprocess_shell(
             "ffmpeg -version",
             stdout=asyncio.subprocess.PIPE,
@@ -44,18 +41,32 @@ async def encode_video():
             que.task_done()
             continue
 
-        # Verify input file exists
+
         if not os.path.exists(file_path):
             await progress_message.edit_text(f"❌ Input file not found: {file_path}")
             que.task_done()
             continue
 
-        # FFmpeg command to generate HLS files
+        process = await asyncio.create_subprocess_shell(
+            f'ffmpeg -i "{file_path}" -f null -',
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE
+        )
+        _, stderr = await process.communicate()
+        audio_count = stderr.decode().count("Audio:")
+        languages = ["eng", "spa", "fre", "ger", "ita"]  # Extend as needed
+        var_stream_map = " ".join(f"v:0,a:{i},name:{languages[i]}" for i in range(min(audio_count, len(languages))))
+
         cmd = (
             f'ffmpeg -hide_banner -y -i "{file_path}" '
-            f'-c:v copy -c:a copy -hls_time 5 -hls_list_size 0 '
+            f'-map 0:v -map 0:a '
+            f'-c:v libx264 -c:a aac -b:a 192k '
+            f'-var_stream_map "{var_stream_map}" '
+            f'-master_pl_name master.m3u8 '
+            f'-hls_time 5 -hls_list_size 0 '
+            f'-hls_segment_filename "{hls_dir}/v%v/segment%d.ts" '
             f'-progress pipe:1 '
-            f'"{hls_dir}/output.m3u8"'
+            f'"{hls_dir}/v%v/output.m3u8"'
         )
         logger.info(f"Running FFmpeg command: {cmd}")
 
@@ -65,35 +76,35 @@ async def encode_video():
             stderr=asyncio.subprocess.PIPE
         )
 
-        # Capture FFmpeg output for debugging
+        # Progress tracking
+        while process.returncode is None:
+            await asyncio.sleep(2)
+            v0_dir = f"{hls_dir}/v0"
+            if os.path.exists(v0_dir):
+                ts_files = [f for f in os.listdir(v0_dir) if f.endswith(".ts")]
+                segment_count = len(ts_files)
+                progress = min(100, int((segment_count / 100) * 100))  # Adjust divisor if needed
+                bar = "█" * (progress // 5) + " " * (20 - (progress // 5))
+                try:
+                    await progress_message.edit_text(f"🚀 Encoding... \n\n[{bar}] {progress}%")
+                except Exception:
+                    pass
+
         stdout, stderr = await process.communicate()
         return_code = process.returncode
 
-        # Progress tracking (simplified for now, can be re-added if needed)
-        while process.returncode is None:
-            await asyncio.sleep(2)
-            ts_files = [f for f in os.listdir(hls_dir) if f.endswith(".ts")]
-            segment_count = len(ts_files)
-            progress = min(100, int((segment_count / 100) * 100))
-            bar = "█" * (progress // 5) + " " * (20 - (progress // 5))
-            try:
-                await progress_message.edit_text(f"🚀 Encoding... \n\n[{bar}] {progress}%")
-            except Exception:
-                pass
-
-        await process.wait()
         unique_id = str(uuid.uuid4())
         if return_code == 0:
             file_size = os.path.getsize(file_path)
             await progress_message.edit_text(
-                "✅ **Encoding Complete!** 🎉\n\n"
-                "🔹 **Progress:** `[████████████████████]` **100%**\n"
-                f"🔹 **Filename:** `{file_name}`\n"
-                f"🔹 **Size:** `{round(file_size / (1024 * 1024), 2)} MB`\n\n"
-                "⚡ **Completed...**"
-                f"**Link** : https://media.mehub.in/video/{unique_id}"
+                "✨ **Encoding Masterpiece Complete!** 🎉\n\n"
+                "📊 **Progress:** `[███████████]` **100%**\n"
+                f"🎬 **Filename:** `{file_name}`\n"
+                f"💾 **Size:** `{round(file_size / (1024 * 1024), 2)} MB`\n"
+                f"🌐 **Stream Now:** [Watch Here](https://media.mehub.in/video/{unique_id})\n\n"
+                "⚡ **Ready to Enjoy!** 🚀"
             )
-            insert_video(msg, file_id, file_name ,unique_id)
+            insert_video(msg, file_id, file_name, unique_id)
         else:
             error_message = stderr.decode() if stderr else "Unknown error"
             await progress_message.edit_text(f"❌ Encoding Failed!\n\nError: {error_message}")
