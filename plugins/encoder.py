@@ -11,7 +11,6 @@ from plugins.video import que
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-
 async def encode_video():
     while True:
         video_data = await que.get()
@@ -25,18 +24,27 @@ async def encode_video():
 
         file_path = os.path.abspath(file_path)
         hls_dir = f"downloads/{file_id}"
-        os.makedirs(hls_dir, exist_ok=True)
+        video_subdir = f"{hls_dir}/video"
+        os.makedirs(video_subdir, exist_ok=True)
 
         if not progress_message:
             logger.warning("No progress message provided, skipping task")
+            await progress_message.edit_text("❌ **Error:** No progress message provided!")
             que.task_done()
             continue
 
+        if not os.path.exists(file_path):
+            logger.error(f"File missing before encoding: {file_path}")
+            await progress_message.edit_text("❌ **Error:** Input file missing!")
+            que.task_done()
+            continue
+
+        logger.info(f"Encoding file: {file_path}")
         await progress_message.edit_text("🚀 **Encoding Started... [0%]**")
         start_time = time.time()
 
         try:
-            # Check if FFmpeg is installed
+            # Check FFmpeg
             ffmpeg_check = await asyncio.create_subprocess_shell(
                 "ffmpeg -version",
                 stdout=asyncio.subprocess.PIPE,
@@ -44,18 +52,14 @@ async def encode_video():
             )
             stdout, stderr = await ffmpeg_check.communicate()
             if ffmpeg_check.returncode != 0:
-                raise RuntimeError(f"FFmpeg not found or failed: {stderr.decode()}")
+                raise RuntimeError(f"FFmpeg not found: {stderr.decode()}")
 
-            # Verify input file exists
-            if not os.path.exists(file_path):
-                raise FileNotFoundError(f"Input file not found: {file_path}")
-
-            # Step 1: Copy video stream
+            # Encode video
             video_cmd = (
                 f'ffmpeg -hide_banner -y -i "{file_path}" '
                 f'-map 0:v -c:v copy -an '
                 f'-hls_time 5 -hls_list_size 0 '
-                f'-hls_segment_filename "{hls_dir}/video/segment%d.ts" '
+                f'-hls_segment_filename "{video_subdir}/segment%d.ts" '
                 f'"{hls_dir}/video/output.m3u8"'
             )
             video_process = await asyncio.create_subprocess_shell(
@@ -64,16 +68,17 @@ async def encode_video():
                 stderr=asyncio.subprocess.PIPE
             )
 
-            # ETA tracking
-            while True:
-                await asyncio.sleep(3)  # Update every 3 seconds
-                elapsed = time.time() - start_time
-                eta = max(5, elapsed * 0.8)  # Adjusted ETA calculation
-                await progress_message.edit_text(f"🚀 **Encoding in Progress... ETA: {int(eta)}s**")
-                if video_process.returncode is not None:
-                    break
+            # Progress update task
+            async def update_progress():
+                while video_process.returncode is None:
+                    await asyncio.sleep(3)
+                    elapsed = time.time() - start_time
+                    await progress_message.edit_text(f"🚀 **Encoding in Progress... [{int(elapsed)}s elapsed]**")
 
+            asyncio.create_task(update_progress())
             stdout, stderr = await video_process.communicate()
+            await video_process.wait()
+
             if video_process.returncode != 0:
                 raise RuntimeError(f"Video encoding failed: {stderr.decode()}")
 
@@ -91,6 +96,12 @@ async def encode_video():
                 "🚀 **Enjoy your video!** 🎉"
             )
 
+            # Cleanup after success
+            if os.path.exists(file_path):
+                os.remove(file_path)
+            if os.path.exists(hls_dir):
+                shutil.rmtree(hls_dir, ignore_errors=True)
+
         except Exception as e:
             logger.error(f"Error during encoding: {str(e)}")
             await progress_message.edit_text(
@@ -98,14 +109,5 @@ async def encode_video():
                 f"⚠️ Error: `{str(e)}`\n"
                 "🔄 Retrying might help or check file format."
             )
-
-        finally:
-            try:
-                if os.path.exists(file_path):
-                    os.remove(file_path)
-                if os.path.exists(hls_dir):
-                    shutil.rmtree(hls_dir, ignore_errors=True)
-            except Exception as cleanup_error:
-                logger.error(f"Cleanup failed: {cleanup_error}")
 
         que.task_done()
