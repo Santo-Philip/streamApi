@@ -119,50 +119,61 @@ async def encode_video():
             async def process_ffmpeg_output():
                 duration = None
                 last_update = 0
+                stderr_output = []
+                stdout_output = []
+
+                # Read stderr for progress
                 while True:
                     line = await video_process.stderr.readline()
                     if not line and video_process.returncode is not None:
                         break
-                    line = line.decode().strip()
-                    if not line:
-                        continue
-
-                    if "Duration" in line and not duration:
-                        parts = line.split("Duration: ")[1].split(",")[0]
-                        h, m, s = map(float, parts.split(":"))
-                        duration = h * 3600 + m * 60 + s
-                        logger.info(f"Detected duration: {duration} seconds")
-
-                    current_time = time.time()
-                    if "time=" in line and duration:
-                        time_str = line.split("time=")[1].split(" ")[0]
-                        h, m, s = map(float, time_str.split(":"))
-                        processed_time = h * 3600 + m * 60 + s
-                        progress = min(100, int((processed_time / duration) * 100))
-                        if current_time - last_update >= 3:  # Update every 3 seconds
+                    if line:
+                        stderr_line = line.decode().strip()
+                        stderr_output.append(stderr_line)
+                        if "Duration" in stderr_line and not duration:
+                            parts = stderr_line.split("Duration: ")[1].split(",")[0]
+                            h, m, s = map(float, parts.split(":"))
+                            duration = h * 3600 + m * 60 + s
+                            logger.info(f"Detected duration: {duration} seconds")
+                        current_time = time.time()
+                        if "time=" in stderr_line and duration:
+                            time_str = stderr_line.split("time=")[1].split(" ")[0]
+                            h, m, s = map(float, time_str.split(":"))
+                            processed_time = h * 3600 + m * 60 + s
+                            progress = min(100, int((processed_time / duration) * 100))
+                            if current_time - last_update >= 3:  # Update every 3 seconds
+                                bar = "█" * (progress // 10) + "-" * (10 - progress // 10)
+                                await progress_message.edit_text(f"{base_message}\n⏳ **Progress:** [{bar}] {progress}%")
+                                last_update = current_time
+                        elif current_time - start_time > 1 and current_time - last_update >= 3:  # Fallback for copy
+                            elapsed = current_time - start_time
+                            progress = min(100, int((elapsed / 10) * 100))  # Assume 10s for copy
                             bar = "█" * (progress // 10) + "-" * (10 - progress // 10)
                             await progress_message.edit_text(f"{base_message}\n⏳ **Progress:** [{bar}] {progress}%")
                             last_update = current_time
-                    elif current_time - start_time > 1 and current_time - last_update >= 3:  # Fallback for copy
-                        elapsed = current_time - start_time
-                        progress = min(100, int((elapsed / 10) * 100))  # Assume 10s for copy
-                        bar = "█" * (progress // 10) + "-" * (10 - progress // 10)
-                        await progress_message.edit_text(f"{base_message}\n⏳ **Progress:** [{bar}] {progress}%")
-                        last_update = current_time
 
-                # Final update
+                # Read remaining stdout
+                while True:
+                    line = await video_process.stdout.readline()
+                    if not line:
+                        break
+                    stdout_output.append(line.decode().strip())
+
+                # Wait for process to complete and check return code
+                await video_process.wait()
+                if video_process.returncode != 0:
+                    error_msg = "\n".join(stderr_output) if stderr_output else "Unknown FFmpeg error"
+                    raise RuntimeError(f"Video/audio processing failed: {error_msg}")
+
+                # Final progress update
                 await progress_message.edit_text(f"{base_message}\n⏳ **Progress:** [██████████] 100%")
+                return "\n".join(stdout_output), "\n".join(stderr_output)
 
-            # Run progress monitoring
+            # Run FFmpeg and monitor output
             progress_task = asyncio.create_task(process_ffmpeg_output())
-            stdout, stderr = await video_process.communicate()
-            await video_process.wait()
-            if video_process.returncode != 0:
-                error_msg = stderr.decode() if stderr else "Unknown FFmpeg error"
-                raise RuntimeError(f"Video/audio processing failed: {error_msg}")
-            await progress_task
-
-            logger.info(f"FFmpeg stdout: {stdout.decode()}")
+            stdout, stderr = await progress_task
+            logger.info(f"FFmpeg stdout: {stdout}")
+            logger.info(f"FFmpeg stderr: {stderr}")
 
             # Extract and convert subtitles
             for idx, (sub_idx, sub_codec) in enumerate(subtitle_streams):
@@ -191,7 +202,7 @@ async def encode_video():
                     if os.path.exists(f"{subtitle_subdir}/sub_{idx}.vtt"):
                         f.write(
                             f'#EXT-X-MEDIA:TYPE=SUBTITLES,GROUP-ID="subs",NAME="Subtitle {idx}",URI="../subtitles/sub_{idx}.vtt"\n')
-                f.write('#EXT-X-STREAM-INF:BANDWIDTH=5000000,RESOLUTION=1280x720,SUBTILES="subs"\n')
+                f.write('#EXT-X-STREAM-INF:BANDWIDTH=5000000,RESOLUTION=1280x720,SUBTITLES="subs"\n')
                 f.write('v0/playlist.m3u8\n')
 
             logger.info("Processing completed successfully")
