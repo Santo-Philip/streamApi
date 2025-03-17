@@ -60,7 +60,7 @@ async def encode_video():
                 f'-map 0:v -c:v copy -an '
                 f'-hls_time 5 -hls_list_size 0 '
                 f'-hls_segment_filename "{video_subdir}/segment%d.ts" '
-                f'"{hls_dir}/video/output.m3u8"'
+                f'"{hls_dir}/output.m3u8"'
             )
             logger.info(f"Running FFmpeg command: {video_cmd}")
             video_process = await asyncio.create_subprocess_shell(
@@ -69,7 +69,6 @@ async def encode_video():
                 stderr=asyncio.subprocess.PIPE
             )
 
-            # Progress bar update task
             async def update_progress():
                 ESTIMATED_DURATION = 60  # Adjust based on typical video length
                 while video_process.returncode is None:
