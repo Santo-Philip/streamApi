@@ -3,9 +3,11 @@ import os
 import shutil
 import logging
 import uuid
+import time
 from database.video import insert_video
 from plugins.video import que
 
+# Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -31,6 +33,7 @@ async def encode_video():
             continue
 
         await progress_message.edit_text("🚀 **Encoding Started... [0%]**")
+        start_time = time.time()
 
         try:
             # Check if FFmpeg is installed
@@ -47,17 +50,6 @@ async def encode_video():
             if not os.path.exists(file_path):
                 raise FileNotFoundError(f"Input file not found: {file_path}")
 
-            # Get audio track info
-            process = await asyncio.create_subprocess_shell(
-                f'ffmpeg -i "{file_path}" -f null -',
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE
-            )
-            _, stderr = await process.communicate()
-            stderr_str = stderr.decode()
-            audio_count = stderr_str.count("Audio:")
-            is_aac = "aac" in stderr_str.lower()
-
             # Step 1: Copy video stream
             video_cmd = (
                 f'ffmpeg -hide_banner -y -i "{file_path}" '
@@ -72,36 +64,16 @@ async def encode_video():
                 stderr=asyncio.subprocess.PIPE
             )
 
-            audio_playlists = []
-            for i in range(audio_count):
-                audio_dir = f"{hls_dir}/audio_{i}"
-                os.makedirs(audio_dir, exist_ok=True)
-                audio_cmd = (
-                    f'ffmpeg -hide_banner -y -i "{file_path}" '
-                    f'-map 0:a:{i} '
-                    f'-c:a {"copy" if is_aac else "aac"} -b:a 128k '
-                    f'-hls_time 5 -hls_list_size 0 '
-                    f'-hls_segment_filename "{audio_dir}/segment%d.ts" '
-                    f'"{audio_dir}/output.m3u8"'
-                )
-                audio_process = await asyncio.create_subprocess_shell(
-                    audio_cmd,
-                    stdout=asyncio.subprocess.PIPE,
-                    stderr=asyncio.subprocess.PIPE
-                )
-                stdout, stderr = await audio_process.communicate()
-                if audio_process.returncode == 0:
-                    audio_playlists.append(f'audio_{i}/output.m3u8')
+            while True:
+                await asyncio.sleep(3)  # Update every 3 seconds
+                elapsed = time.time() - start_time
+                eta = elapsed * 1.5  # Approximate ETA multiplier
+                await progress_message.edit_text(f"🚀 **Encoding in Progress... ETA: {int(eta)}s**")
+                if video_process.returncode is not None:
+                    break
 
-            master_playlist = "#EXTM3U\n#EXT-X-VERSION:3\n"
-            for i, audio in enumerate(audio_playlists):
-                master_playlist += (
-                    f'#EXT-X-MEDIA:TYPE=AUDIO,GROUP-ID="audio",NAME="Track {i + 1}",DEFAULT={"YES" if i == 0 else "NO"},AUTOSELECT=YES,URI="{audio}"'
-                )
-            master_playlist += f'#EXT-X-STREAM-INF:BANDWIDTH=2000000,AUDIO="audio"\nvideo/output.m3u8\n'
-
-            with open(f"{hls_dir}/master.m3u8", "w") as f:
-                f.write(master_playlist)
+            if video_process.returncode != 0:
+                raise RuntimeError("Video encoding failed.")
 
             await progress_message.edit_text("🚀 **Encoding Complete! Finalizing...**")
 
@@ -120,8 +92,6 @@ async def encode_video():
         except Exception as e:
             logger.error(f"Error during encoding: {str(e)}")
             await progress_message.edit_text(f"❌ **Encoding Failed!**\n\n⚠️ Error: `{str(e)}`")
-
-        finally:
             try:
                 if os.path.exists(file_path):
                     os.remove(file_path)
