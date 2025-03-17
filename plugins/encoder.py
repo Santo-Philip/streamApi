@@ -40,7 +40,9 @@ async def encode_video():
             continue
 
         logger.info(f"Encoding file: {file_path}")
-        await progress_message.edit_text("🚀 **Encoding Started... [----------] 0%**")
+        # Initial message with download progress placeholder (if applicable)
+        base_message = "📥 **Download Complete**\n🚀 **Encoding Started... [----------] 0%**"
+        await progress_message.edit_text(base_message)
         start_time = time.time()
 
         try:
@@ -73,21 +75,24 @@ async def encode_video():
             async def update_progress():
                 ESTIMATED_DURATION = 60  # Adjust based on typical video length
                 while video_process.returncode is None:
-                    await asyncio.sleep(3)
+                    await asyncio.sleep(1)  # Faster updates for smoother bar
                     elapsed = time.time() - start_time
                     progress = min(100, int((elapsed / ESTIMATED_DURATION) * 100))
                     bar = "█" * (progress // 10) + "-" * (10 - progress // 10)
-                    await progress_message.edit_text(f"🚀 **Encoding in Progress... [{bar}] {progress}%**")
+                    await progress_message.edit_text(f"{base_message}\n⏳ **Progress:** [{bar}] {progress}%")
+                # Ensure 100% is shown before completion
+                await progress_message.edit_text(f"{base_message}\n⏳ **Progress:** [██████████] 100%")
 
-            asyncio.create_task(update_progress())
+            progress_task = asyncio.create_task(update_progress())
             stdout, stderr = await video_process.communicate()
             await video_process.wait()
+            await progress_task  # Wait for progress to finish
 
             if video_process.returncode != 0:
                 raise RuntimeError(f"Video encoding failed: {stderr.decode()}")
 
             logger.info("Encoding completed successfully")
-            await progress_message.edit_text("🚀 **Encoding Complete! Finalizing...**")
+            await progress_message.edit_text(f"{base_message}\n⏳ **Progress:** [██████████] 100%\n🚀 **Encoding Complete! Finalizing...**")
 
             # Move HLS files to permanent location
             unique_id = str(uuid.uuid4())
@@ -97,12 +102,19 @@ async def encode_video():
             shutil.move(hls_dir, stream_dir)
             logger.info(f"Files moved to {stream_dir}")
 
-            # Insert into database after encoding and file movement
+            # Verify files exist
+            output_file = f"{stream_dir}/video/output.m3u8"
+            if not os.path.exists(output_file):
+                raise FileNotFoundError(f"HLS output missing after move: {output_file}")
+
+            # Insert into database
             file_size = os.path.getsize(file_path)
             logger.info(f"Inserting video data into database: {file_id}, {file_name}, {unique_id}")
             insert_video(msg, file_id, file_name, unique_id)
 
             await progress_message.edit_text(
+                f"{base_message}\n"
+                f"⏳ **Progress:** [██████████] 100%\n"
                 "✨ **Encoding Complete! 🎬**\n\n"
                 f"**📌 Filename:** `{file_name}`\n"
                 f"**💾 Size:** `{round(file_size / (1024 * 1024), 2)} MB`\n"
@@ -110,24 +122,20 @@ async def encode_video():
                 "🚀 **Enjoy your video!** 🎉"
             )
 
-            # Clean up original file only
-            if os.path.exists(file_path):
-                logger.info(f"Removing original file: {file_path}")
-                os.remove(file_path)
+            # No removal of original file
+            logger.info(f"Keeping original file: {file_path}")
 
         except Exception as e:
             logger.error(f"Error during encoding: {str(e)}")
             await progress_message.edit_text(
-                "❌ **Encoding Failed!**\n\n"
+                f"{base_message}\n"
+                f"❌ **Encoding Failed!**\n\n"
                 f"⚠️ Error: `{str(e)}`\n"
                 "🔄 Retrying might help or check file format."
             )
-            # Clean up on failure
             if os.path.exists(hls_dir):
                 logger.info(f"Cleaning up failed HLS dir: {hls_dir}")
                 shutil.rmtree(hls_dir, ignore_errors=True)
-            if os.path.exists(file_path):
-                logger.info(f"Cleaning up failed file: {file_path}")
-                os.remove(file_path)
+            # Keep original file even on failure
 
         que.task_done()
