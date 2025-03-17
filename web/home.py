@@ -110,7 +110,6 @@ async def serve_video_player(request):
 
         hls_path = f"/hls/{video_id}/master.m3u8"
         video_title = video_details.get('title', 'Video Player')
-        logo_url = "/static/logo.png"  # Adjust this to your actual logo URL
         html_content = f"""
         <!DOCTYPE html>
         <html>
