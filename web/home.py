@@ -128,8 +128,6 @@ async def serve_video_player(request):
                 }}
                 .video-container {{
                     position: relative;
-                    width: 100%;
-                    height: 100vh;
                 }}
                 .video-js {{ 
                     width: 100%; 
