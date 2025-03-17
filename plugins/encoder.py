@@ -9,13 +9,13 @@ import json
 import subprocess
 from database.video import insert_video
 from plugins.video import que
+from pyrogram.errors import MessageNotModified
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
 async def encode_video():
-    global progress_task
     while True:
         video_data = await que.get()
         file_path = video_data["file_path"]
@@ -118,6 +118,7 @@ async def encode_video():
                 duration = None
                 last_update = 0
                 stderr_output = []
+                last_progress = -1  # Track last progress to avoid duplicates
 
                 # Read stderr for progress
                 while process.poll() is None:
@@ -135,16 +136,27 @@ async def encode_video():
                             h, m, s = map(float, time_str.split(":"))
                             processed_time = h * 3600 + m * 60 + s
                             progress = min(100, int((processed_time / duration) * 100))
-                            if current_time - last_update >= 3:  # Update every 3 seconds
+                            if current_time - last_update >= 3 and progress != last_progress:  # Update every 3s if changed
                                 bar = "█" * (progress // 10) + "-" * (10 - progress // 10)
-                                await progress_message.edit_text(f"{base_message}\n⏳ **Progress:** [{bar}] {progress}%")
-                                last_update = current_time
+                                try:
+                                    await progress_message.edit_text(
+                                        f"{base_message}\n⏳ **Progress:** [{bar}] {progress}%")
+                                    last_update = current_time
+                                    last_progress = progress
+                                except MessageNotModified:
+                                    pass  # Ignore if the message hasn't changed
                         elif current_time - start_time > 1 and current_time - last_update >= 3:  # Fallback for copy
                             elapsed = current_time - start_time
                             progress = min(100, int((elapsed / 10) * 100))  # Assume 10s for copy
-                            bar = "█" * (progress // 10) + "-" * (10 - progress // 10)
-                            await progress_message.edit_text(f"{base_message}\n⏳ **Progress:** [{bar}] {progress}%")
-                            last_update = current_time
+                            if progress != last_progress:
+                                bar = "█" * (progress // 10) + "-" * (10 - progress // 10)
+                                try:
+                                    await progress_message.edit_text(
+                                        f"{base_message}\n⏳ **Progress:** [{bar}] {progress}%")
+                                    last_update = current_time
+                                    last_progress = progress
+                                except MessageNotModified:
+                                    pass
                     await asyncio.sleep(0.1)  # Prevent tight loop
 
                 # Read remaining stderr and stdout
@@ -160,7 +172,8 @@ async def encode_video():
                     raise RuntimeError(f"Video/audio processing failed: {error_msg}")
 
                 # Final progress update
-                await progress_message.edit_text(f"{base_message}\n⏳ **Progress:** [██████████] 100%")
+                if last_progress != 100:
+                    await progress_message.edit_text(f"{base_message}\n⏳ **Progress:** [██████████] 100%")
                 return stdout_output, "\n".join(stderr_output)
 
             # Run FFmpeg and monitor output
