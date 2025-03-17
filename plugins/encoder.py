@@ -6,6 +6,9 @@ import uuid
 import time
 import shlex
 import json
+
+from pyrogram.errors import MessageNotModified
+
 from database.video import insert_video
 from plugins.video import que
 
@@ -225,7 +228,8 @@ async def encode_video():
 
             logger.info(f"Keeping original file: {file_path}")
             logger.info(f"HLS files retained in: {hls_dir}")
-
+        except MessageNotModified as s:
+            print(s)
         except Exception as e:
             logger.error(f"Error during processing: {str(e)}")
             if 'progress_task' in locals():
