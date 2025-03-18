@@ -310,8 +310,13 @@
                         if (response.ok) {
                             console.log(`Deleted video with token: ${token}`);
                             event.target.closest('.video-item').remove();
+                            window.location.reload()
                         } else {
-                            alert('Failed to delete video');
+                            videoInfo.innerHTML = '<p class="error">Failed to delete video</p>';
+                    setTimeout(() => {
+                        videoInfo.innerHTML = '';
+                    }, 2000);
+                            window.location.reload();
                         }
                     })
                     .catch(error => {
