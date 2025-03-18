@@ -12,7 +12,7 @@ async def start_web_server():
     app.router.add_get('/hls/{file:.+}', serve_hls)
     app.router.add_get('/video/{token}', serve_video_player)
     app.router.add_get('/videos', video_index)
-    app.router.add_get('/videos/{token}',delete_video)
+    app.router.add_delete('/videos/{token}', delete_video)
     runner = web.AppRunner(app)
     await runner.setup()
     site = web.TCPSite(runner, "0.0.0.0", 8080)

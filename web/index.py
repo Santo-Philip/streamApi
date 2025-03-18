@@ -103,6 +103,13 @@ async def video_index(request):
         return web.Response(text=f"Error loading page: {str(e)}", status=500)
 
 
+import os
+import shutil
+from aiohttp import web
+from database.spbase import supabase
+from web.home import logger
+
+
 async def delete_video(request):
     try:
         token = request.match_info.get('token')  # Assuming token is unique_id
@@ -110,15 +117,15 @@ async def delete_video(request):
             return web.Response(text="Token is required", status=400)
 
         # Fetch video details from Supabase to get file_id (for HLS) and confirm existence
-        video_response = supabase.table("stream").select().eq("video", token).execute()
+        video_response = supabase.table("stream").select("file_id").eq("token", token).execute()
         if not video_response.data or len(video_response.data) == 0:
             logger.warning(f"Video not found in database for deletion: {token}")
             return web.Response(text="Video not found", status=404)
 
-        file_id = video_response.data[0].get('video', token)  # Fallback to token if file_id not available
+        file_id = video_response.data[0].get('file_id', token)  # Fallback to token if file_id not available
 
         # Delete from Supabase
-        response = supabase.table("stream").delete().eq("video", token).execute()
+        response = supabase.table("stream").delete().eq("token", token).execute()
         if not response.data:
             logger.warning(f"Video not found in database for deletion: {token}")
             return web.Response(text="Video not found", status=404)
@@ -138,8 +145,8 @@ async def delete_video(request):
         else:
             logger.warning(f"HLS folder not found for file_id: {file_id}")
 
-        # Delete original file (try common extensions if exact extension isn't stored)
-        possible_extensions = ['.mp4', '.mkv', '.avi', '.mov']  # Add more as needed
+        # Delete original file (try common extensions)
+        possible_extensions = ['.mp4', '.mkv', '.avi', '.mov']
         original_file_path = None
         for ext in possible_extensions:
             candidate_path = os.path.join(originals_dir, f"{token}{ext}")
