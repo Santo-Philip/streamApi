@@ -48,17 +48,15 @@ async def encode_video():
             continue
 
         logger.info(f"Processing file: {file_path}")
-        base_message = "📥 **Download Complete**\n🚀 **Encoding Started... [----------] 0%**"
+        base_message = "📥 **Download Complete**\n⏳ **Progress:** [██████████] 100%**\n\n🚀 Encoding Started..."
         await progress_message.edit_text(base_message)
         start_time = time.time()
 
         try:
-            # Check FFmpeg
             ffmpeg_check = subprocess.run("ffmpeg -version", shell=True, capture_output=True, text=True)
             if ffmpeg_check.returncode != 0:
                 raise RuntimeError(f"FFmpeg not found: {ffmpeg_check.stderr}")
 
-            # Probe input file for stream info
             probe_cmd = f'ffprobe -v error -show_entries stream=index,codec_type,codec_name,sample_rate,channels -of json {shlex.quote(file_path)}'
             probe_process = subprocess.run(probe_cmd, shell=True, capture_output=True, text=True)
             if probe_process.returncode != 0:
