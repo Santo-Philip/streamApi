@@ -117,15 +117,15 @@ async def delete_video(request):
             return web.Response(text="Token is required", status=400)
 
         # Fetch video details from Supabase to get file_id (for HLS) and confirm existence
-        video_response = supabase.table("stream").select("file_id").eq("token", token).execute()
+        video_response = supabase.table("stream").select("video").eq("video", token).execute()
         if not video_response.data or len(video_response.data) == 0:
             logger.warning(f"Video not found in database for deletion: {token}")
             return web.Response(text="Video not found", status=404)
 
-        file_id = video_response.data[0].get('file_id', token)  # Fallback to token if file_id not available
+        file_id = video_response.data[0].get('video', token)  # Fallback to token if file_id not available
 
         # Delete from Supabase
-        response = supabase.table("stream").delete().eq("token", token).execute()
+        response = supabase.table("stream").delete().eq("video", token).execute()
         if not response.data:
             logger.warning(f"Video not found in database for deletion: {token}")
             return web.Response(text="Video not found", status=404)
