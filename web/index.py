@@ -102,46 +102,36 @@ async def video_index(request):
         logger.error(f"Error loading page: {str(e)}")
         return web.Response(text=f"Error loading page: {str(e)}", status=500)
 
-
-import os
-import shutil
-from aiohttp import web
-from database.spbase import supabase
-from web.home import logger
-
-
 async def delete_video(request):
     try:
-        token = request.match_info.get('token')  # Assuming token is unique_id
-        if not token:
-            return web.Response(text="Token is required", status=400)
+        file_id = request.match_info.get('token')  # Rename to file_id for clarity, as it matches logs
+        if not file_id:
+            return web.Response(text="Video ID is required", status=400)
 
-        # Fetch video details from Supabase to get file_id (for HLS) and confirm existence
-        video_response = supabase.table("stream").select("video").eq("video", token).execute()
+        # Check if the video exists in Supabase
+        video_response = supabase.table("stream").select("*").eq("video", file_id).execute()
         if not video_response.data or len(video_response.data) == 0:
-            logger.warning(f"Video not found in database for deletion: {token}")
+            logger.warning(f"Video not found in database for deletion: {file_id}")
             return web.Response(text="Video not found", status=404)
 
-        file_id = video_response.data[0].get('video', token)  # Fallback to token if file_id not available
-
         # Delete from Supabase
-        response = supabase.table("stream").delete().eq("video", token).execute()
+        response = supabase.table("stream").delete().eq("video", file_id).execute()
         if not response.data:
-            logger.warning(f"Video not found in database for deletion: {token}")
+            logger.warning(f"Video not found in database for deletion: {file_id}")
             return web.Response(text="Video not found", status=404)
 
         # Define paths
         downloads_dir = os.path.join(os.getcwd(), "downloads")
-        token_folder = os.path.join(downloads_dir, file_id)  # HLS folder uses file_id
         originals_dir = os.path.join(os.getcwd(), "originals")
+        hls_folder = os.path.join(downloads_dir, file_id)
 
         # Delete HLS folder if it exists
-        if os.path.exists(token_folder):
+        if os.path.exists(hls_folder):
             try:
-                shutil.rmtree(token_folder)
-                logger.info(f"Successfully deleted HLS folder: {token_folder}")
+                shutil.rmtree(hls_folder)
+                logger.info(f"Successfully deleted HLS folder: {hls_folder}")
             except Exception as file_error:
-                logger.error(f"Failed to delete HLS folder {token_folder}: {str(file_error)}")
+                logger.error(f"Failed to delete HLS folder {hls_folder}: {str(file_error)}")
         else:
             logger.warning(f"HLS folder not found for file_id: {file_id}")
 
@@ -149,7 +139,7 @@ async def delete_video(request):
         possible_extensions = ['.mp4', '.mkv', '.avi', '.mov']
         original_file_path = None
         for ext in possible_extensions:
-            candidate_path = os.path.join(originals_dir, f"{token}{ext}")
+            candidate_path = os.path.join(originals_dir, f"{file_id}{ext}")
             if os.path.exists(candidate_path):
                 original_file_path = candidate_path
                 break
@@ -161,9 +151,9 @@ async def delete_video(request):
             except Exception as file_error:
                 logger.error(f"Failed to delete original file {original_file_path}: {str(file_error)}")
         else:
-            logger.warning(f"Original file not found for token: {token} in {originals_dir}")
+            logger.warning(f"Original file not found for file_id: {file_id} in {originals_dir}")
 
-        logger.info(f"Successfully deleted video with token: {token} from database")
+        logger.info(f"Successfully deleted video with file_id: {file_id} from database")
         return web.Response(text="Video deleted successfully", status=200)
 
     except Exception as e:
