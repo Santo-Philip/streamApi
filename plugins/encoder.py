@@ -252,7 +252,7 @@ async def encode_video():
 
             # Rename and move the original file
             original_extension = os.path.splitext(file_path)[1]  # Get the file extension (e.g., .mp4)
-            new_file_name = f"{unique_id}{original_extension}"
+            new_file_name = f"{file_id}{original_extension}"
             new_file_path = os.path.join(originals_dir, new_file_name)
 
             try:
