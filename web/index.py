@@ -31,7 +31,7 @@ async def video_index(request):
         video_grid = ""
         for i, video in enumerate(videos):
             video_url = video.get('token', '')
-            video = video.get('video','')
+            video_id = video.get('video','')
             video_title = video.get('title', 'Untitled')
             created_at = video.get('created_at', 'Unknown')
             user = video.get('user', 'Unknown')
@@ -82,7 +82,7 @@ async def video_index(request):
                                 <span class="label">Uploaded:</span> <span>{hours_ago_str}</span>
                                 <span class="label">User:</span> <span>{user}</span>
                             </div>
-                            <button class="delete-btn" onclick="deleteVideo('{video}')">Delete</button>
+                            <button class="delete-btn" onclick="deleteVideo('{video_id}')">Delete</button>
                         </div>
                     </div>
                 """
