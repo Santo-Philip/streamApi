@@ -1,7 +1,10 @@
 import os
+import shutil
+
 from aiohttp import web
 from database.spbase import supabase
-
+from datetime import datetime
+import pytz
 from web.home import logger
 
 
@@ -10,8 +13,6 @@ async def video_index(request):
         # Fetch videos from Supabase
         response = supabase.table("stream").select("*").execute()
         videos = response.data if hasattr(response, 'data') else []
-
-        # Log video data for debugging
         logger.info(f"Number of videos fetched: {len(videos)}")
         if videos:
             logger.info(f"First video data: {videos[0]}")
@@ -26,22 +27,63 @@ async def video_index(request):
         with open(file_path, "r", encoding="utf-8") as f:
             html_content = f.read()
 
-        # Generate video grid with iframes
+        # Generate video grid
         video_grid = ""
-        for video in videos:
+        for i, video in enumerate(videos):
             video_url = video.get('token', '')
+            video = video.get('video','')
             video_title = video.get('title', 'Untitled')
+            created_at = video.get('created_at', 'Unknown')
+            user = video.get('user', 'Unknown')
+
+            # Format created_at and calculate hours ago
+            if created_at != 'Unknown':
+                try:
+                    # Parse the created_at as an offset-aware datetime
+                    dt = datetime.fromisoformat(created_at.replace('Z', '+00:00'))
+
+                    # Ensure current time is also offset-aware (UTC)
+                    now_utc = datetime.now(pytz.UTC)
+
+                    # Format date and time
+                    date_str = dt.strftime("%B %d, %Y")  # e.g., "March 18, 2025"
+                    time_str = dt.strftime("%I:%M %p")  # e.g., "03:30 PM"
+
+                    # Calculate hours ago
+                    hours_ago = int((now_utc - dt).total_seconds() / 3600)
+                    hours_ago_str = f"Just now" if hours_ago == 0 else f"{hours_ago} hour{'s' if hours_ago != 1 else ''} ago"
+                except Exception as e:
+                    logger.warning(f"Error formatting date for video {video_url}: {e}")
+                    date_str = "Unknown Date"
+                    time_str = "Unknown Time"
+                    hours_ago_str = "Unknown"
+            else:
+                date_str = "Unknown Date"
+                time_str = "Unknown Time"
+                hours_ago_str = "Unknown"
+
             if video_url:
                 full_url = f"https://media.mehub.in/video/{video_url}"
                 video_grid += f"""
-                    <div class="video-item">
-                        <iframe 
-                            src="{full_url}" 
-                            frameborder="0" 
-                            allow="encrypted-media" 
-                            allowfullscreen
-                        ></iframe>
-                        <h3>{video_title}</h3>
+                    <div class="video-item" style="--order: {i};">
+                        <div class="video-wrapper">
+                            <iframe 
+                                src="{full_url}" 
+                                frameborder="0" 
+                                allow="encrypted-media" 
+                                allowfullscreen
+                            ></iframe>
+                        </div>
+                        <div class="video-info">
+                            <h3>{video_title}</h3>
+                            <div class="video-meta">
+                                <span class="label">Date:</span> <span>{date_str}</span>
+                                <span class="label">Time:</span> <span>{time_str}</span>
+                                <span class="label">Uploaded:</span> <span>{hours_ago_str}</span>
+                                <span class="label">User:</span> <span>{user}</span>
+                            </div>
+                            <button class="delete-btn" onclick="deleteVideo('{video}')">Delete</button>
+                        </div>
                     </div>
                 """
             else:
@@ -59,3 +101,64 @@ async def video_index(request):
     except Exception as e:
         logger.error(f"Error loading page: {str(e)}")
         return web.Response(text=f"Error loading page: {str(e)}", status=500)
+
+
+async def delete_video(request):
+    try:
+        token = request.match_info.get('token')  # Assuming token is unique_id
+        if not token:
+            return web.Response(text="Token is required", status=400)
+
+        # Fetch video details from Supabase to get file_id (for HLS) and confirm existence
+        video_response = supabase.table("stream").select().eq("video", token).execute()
+        if not video_response.data or len(video_response.data) == 0:
+            logger.warning(f"Video not found in database for deletion: {token}")
+            return web.Response(text="Video not found", status=404)
+
+        file_id = video_response.data[0].get('video', token)  # Fallback to token if file_id not available
+
+        # Delete from Supabase
+        response = supabase.table("stream").delete().eq("video", token).execute()
+        if not response.data:
+            logger.warning(f"Video not found in database for deletion: {token}")
+            return web.Response(text="Video not found", status=404)
+
+        # Define paths
+        downloads_dir = os.path.join(os.getcwd(), "downloads")
+        token_folder = os.path.join(downloads_dir, file_id)  # HLS folder uses file_id
+        originals_dir = os.path.join(os.getcwd(), "originals")
+
+        # Delete HLS folder if it exists
+        if os.path.exists(token_folder):
+            try:
+                shutil.rmtree(token_folder)
+                logger.info(f"Successfully deleted HLS folder: {token_folder}")
+            except Exception as file_error:
+                logger.error(f"Failed to delete HLS folder {token_folder}: {str(file_error)}")
+        else:
+            logger.warning(f"HLS folder not found for file_id: {file_id}")
+
+        # Delete original file (try common extensions if exact extension isn't stored)
+        possible_extensions = ['.mp4', '.mkv', '.avi', '.mov']  # Add more as needed
+        original_file_path = None
+        for ext in possible_extensions:
+            candidate_path = os.path.join(originals_dir, f"{token}{ext}")
+            if os.path.exists(candidate_path):
+                original_file_path = candidate_path
+                break
+
+        if original_file_path:
+            try:
+                os.remove(original_file_path)
+                logger.info(f"Successfully deleted original file: {original_file_path}")
+            except Exception as file_error:
+                logger.error(f"Failed to delete original file {original_file_path}: {str(file_error)}")
+        else:
+            logger.warning(f"Original file not found for token: {token} in {originals_dir}")
+
+        logger.info(f"Successfully deleted video with token: {token} from database")
+        return web.Response(text="Video deleted successfully", status=200)
+
+    except Exception as e:
+        logger.error(f"Error deleting video: {str(e)}")
+        return web.Response(text=f"Error deleting video: {str(e)}", status=500)

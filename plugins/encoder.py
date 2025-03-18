@@ -35,6 +35,10 @@ async def encode_video():
         os.makedirs(audio_subdir, exist_ok=True)
         os.makedirs(subtitle_subdir, exist_ok=True)
 
+        # Define directory for original files
+        originals_dir = os.path.join(os.getcwd(), "originals")
+        os.makedirs(originals_dir, exist_ok=True)
+
         if not progress_message:
             logger.warning("No progress message provided, skipping task")
             await progress_message.edit_text("❌ **Error:** No progress message provided!")
@@ -246,6 +250,21 @@ async def encode_video():
             logger.info(f"Inserting video data into database: {file_id}, {file_name}, {unique_id}")
             insert_video(msg, file_id, file_name, unique_id)
 
+            # Rename and move the original file
+            original_extension = os.path.splitext(file_path)[1]  # Get the file extension (e.g., .mp4)
+            new_file_name = f"{unique_id}{original_extension}"
+            new_file_path = os.path.join(originals_dir, new_file_name)
+
+            try:
+                shutil.move(file_path, new_file_path)
+                logger.info(f"Renamed and moved original file from {file_path} to {new_file_path}")
+            except Exception as e:
+                logger.error(f"Failed to rename/move original file {file_path} to {new_file_path}: {str(e)}")
+                # Optionally, you could copy instead of move and delete the original if move fails
+                shutil.copy2(file_path, new_file_path)
+                os.remove(file_path)
+                logger.info(f"Copied and deleted original file as fallback: {new_file_path}")
+
             await progress_message.edit_text(
                 f"{base_message}\n"
                 f"⏳ **Progress:** [██████████] 100%\n"
@@ -258,7 +277,7 @@ async def encode_video():
                 "🚀 **Enjoy your video!** 🎉"
             )
 
-            logger.info(f"Keeping original file: {file_path}")
+            logger.info(f"Original file renamed and stored as: {new_file_path}")
             logger.info(f"HLS files retained in: {hls_dir}")
 
         except Exception as e:

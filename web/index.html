@@ -4,52 +4,356 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Video Gallery</title>
+    <link rel="shortcut icon" type="image/x-icon" href="https://mehub.in/logo.ico" />
+    <link href="https://fonts.googleapis.com/css2?family=SF+Pro+Display:wght@400;600&display=swap" rel="stylesheet">
     <style>
-        body {
-            font-family: Arial, sans-serif;
+        :root {
+            --primary-color: #fff;
+            --secondary-color: #a1a1a6;
+            --bg-color: #000;
+            --card-bg: #1c1c1e;
+            --hover-color: #ff2d55;
+            --accent-color: #007aff;
+            --transition: all 0.3s cubic-bezier(0.25, 0.1, 0.25, 1);
+        }
+
+        * {
             margin: 0;
-            padding: 20px;
-            background-color: #f0f0f0;
+            padding: 0;
+            box-sizing: border-box;
         }
-        h1 {
-            text-align: center;
-            color: #333;
+
+        body {
+            font-family: 'SF Pro Display', -apple-system, BlinkMacSystemFont, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--primary-color);
+            line-height: 1.6;
+            overflow-x: hidden;
         }
+
+        .app-bar {
+            position: sticky;
+            top: 0;
+            background: rgba(28, 28, 30, 0.95);
+            backdrop-filter: blur(10px);
+            padding: 12px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            z-index: 1000;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+        }
+
+        .app-bar h1 {
+            font-size: 1.5rem;
+            font-weight: 600;
+            margin: 0;
+            letter-spacing: -0.02em;
+            opacity: 0;
+            animation: fadeIn 0.8s ease forwards;
+        }
+
+        .app-bar .search {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            padding: 6px 12px;
+            color: var(--secondary-color);
+            font-size: 0.9rem;
+            transition: var(--transition);
+        }
+
+        .app-bar .search:hover {
+            background: rgba(255, 255, 255, 0.15);
+        }
+
         .video-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-            gap: 20px;
-            max-width: 1200px;
-            margin: 20px auto;
+            grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+            gap: 24px;
+            max-width: 1440px;
+            margin: 40px auto;
+            padding: 0 40px;
         }
+
         .video-item {
-            background-color: white;
-            padding: 10px;
-            border-radius: 5px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            background-color: var(--card-bg);
+            border-radius: 16px;
+            overflow: hidden;
+            transition: var(--transition);
+            transform: translateY(20px);
+            opacity: 0;
+            animation: slideUp 0.5s ease forwards;
+            animation-delay: calc(var(--order) * 0.1s);
         }
+
+        .video-item:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+        }
+
+        .video-wrapper {
+            position: relative;
+            padding-top: 56.25%; /* 16:9 Aspect Ratio (9/16 = 0.5625) */
+            background-color: #000;
+        }
+
         iframe {
+            position: absolute;
+            top: 0;
+            left: 0;
             width: 100%;
-            height: 200px;
+            height: 100%;
+            border: none;
             display: block;
+            padding: 12px;
+            transition: var(--transition);
         }
+
+        .video-info {
+            padding: 12px;
+            position: relative;
+        }
+
         h3 {
-            margin: 10px 0 0;
-            font-size: 16px;
-            text-align: center;
-            color: #333;
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: var(--primary-color);
+            margin-bottom: 8px;
+            text-align: left;
+            transition: var(--transition);
         }
-        @media (max-width: 600px) {
+
+        .video-item:hover h3 {
+            color: var(--accent-color);
+        }
+
+        .video-meta {
+            display: grid;
+            grid-template-columns: auto 1fr;
+            gap: 4px 12px;
+            font-size: 0.85rem;
+            color: var(--secondary-color);
+            margin-bottom: 12px;
+            opacity: 0.9;
+            transition: var(--transition);
+        }
+
+        .video-meta span {
+            color: var(--primary-color);
+            font-weight: 400;
+        }
+
+        .video-meta .label {
+            color: var(--secondary-color);
+            font-weight: 600;
+        }
+
+        .video-item:hover .video-meta {
+            opacity: 1;
+        }
+
+        .delete-btn {
+            background: linear-gradient(135deg, rgba(255, 45, 85, 0.1), rgba(255, 107, 0, 0.1));
+            border: none;
+            color: var(--hover-color);
+            font-size: 0.9rem;
+            cursor: pointer;
+            padding: 6px 16px;
+            border-radius: 12px;
+            transition: var(--transition);
+            position: absolute;
+            right: 12px;
+            bottom: 12px;
+        }
+
+        .delete-btn:hover {
+            background: linear-gradient(135deg, #ff2d55, #ff6b00);
+            color: #fff;
+            transform: scale(1.05);
+        }
+
+        .pagination {
+            display: flex;
+            justify-content: center;
+            gap: 12px;
+            margin: 40px 0;
+            padding: 0 40px;
+            opacity: 0;
+            animation: fadeIn 0.8s ease forwards 0.5s;
+        }
+
+        .pagination button {
+            background: var(--card-bg);
+            border: none;
+            color: var(--primary-color);
+            padding: 8px 16px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: var(--transition);
+        }
+
+        .pagination button:hover {
+            background: var(--hover-color);
+            transform: scale(1.05);
+        }
+
+        .pagination button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        @keyframes slideUp {
+            from { transform: translateY(20px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+
+        @media (max-width: 768px) {
+            .video-grid {
+                grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+                gap: 16px;
+                padding: 0 20px;
+            }
+
+            .app-bar {
+                padding: 10px 20px;
+            }
+
+            .app-bar h1 {
+                font-size: 1.3rem;
+            }
+        }
+
+        @media (max-width: 480px) {
             .video-grid {
                 grid-template-columns: 1fr;
+                gap: 12px;
+                padding: 0;
+                margin: 20px 0;
+            }
+
+            .video-item {
+                border-radius: 0;
+                box-shadow: none;
+                margin: 0;
+            }
+
+            .video-wrapper {
+                padding-top: 56.25%; /* Maintain 16:9 */
+            }
+
+            iframe {
+                padding: 0;
+                border-radius: 0;
+            }
+
+            .video-info {
+                padding: 8px 12px;
+                margin: 0;
+            }
+
+            h3 {
+                font-size: 1rem;
+            }
+
+            .video-meta {
+                font-size: 0.75rem;
+            }
+
+            .delete-btn {
+                padding: 4px 12px;
+                font-size: 0.8rem;
+            }
+
+            .app-bar {
+                padding: 8px 12px;
+            }
+
+            .app-bar h1 {
+                font-size: 1.2rem;
+            }
+
+            .app-bar .search {
+                font-size: 0.8rem;
+                padding: 4px 8px;
+            }
+
+            .pagination {
+                padding: 0 12px;
             }
         }
     </style>
 </head>
 <body>
-    <h1>Video Gallery</h1>
+    <div class="app-bar">
+        <h1>Video Gallery</h1>
+        <div class="search">Search</div>
+    </div>
     <div class="video-grid">
         <!-- VIDEO_GRID -->
     </div>
+    <div class="pagination">
+        <button id="prevBtn">Previous</button>
+        <button id="nextBtn">Next</button>
+    </div>
+    <script>
+        function deleteVideo(token) {
+            if (confirm('Are you sure you want to delete this video?')) {
+                fetch(`/videos/${token}`, { method: 'DELETE' })
+                    .then(response => {
+                        if (response.ok) {
+                            console.log(`Deleted video with token: ${token}`);
+                            event.target.closest('.video-item').remove();
+                        } else {
+                            alert('Failed to delete video');
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error deleting video:', error);
+                        alert('Error deleting video');
+                    });
+            }
+        }
+
+        const itemsPerPage = 21;
+        let currentPage = 1;
+        const videoItems = document.querySelectorAll('.video-item');
+
+        function updatePagination() {
+            const totalPages = Math.ceil(videoItems.length / itemsPerPage);
+            const start = (currentPage - 1) * itemsPerPage;
+            const end = start + itemsPerPage;
+
+            videoItems.forEach((item, index) => {
+                item.style.display = (index >= start && index < end) ? 'block' : 'none';
+                item.style.setProperty('--order', index % itemsPerPage);
+            });
+
+            document.getElementById('prevBtn').disabled = currentPage === 1;
+            document.getElementById('nextBtn').disabled = currentPage === totalPages;
+        }
+
+        document.getElementById('prevBtn').addEventListener('click', () => {
+            if (currentPage > 1) {
+                currentPage--;
+                updatePagination();
+            }
+        });
+
+        document.getElementById('nextBtn').addEventListener('click', () => {
+            if (currentPage < Math.ceil(videoItems.length / itemsPerPage)) {
+                currentPage++;
+                updatePagination();
+            }
+        });
+
+        updatePagination();
+    </script>
 </body>
 </html>
