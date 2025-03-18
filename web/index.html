@@ -15,6 +15,8 @@
             --hover-color: #ff2d55;
             --accent-color: #007aff;
             --transition: all 0.3s cubic-bezier(0.25, 0.1, 0.25, 1);
+            --toast-success: #34c759; /* Apple green */
+            --toast-error: #ff3b30;   /* Apple red */
         }
 
         * {
@@ -93,7 +95,7 @@
 
         .video-wrapper {
             position: relative;
-            padding-top: 56.25%; /* 16:9 Aspect Ratio (9/16 = 0.5625) */
+            padding-top: 56.25%; /* 16:9 Aspect Ratio */
             background-color: #000;
         }
 
@@ -204,6 +206,54 @@
             transform: none;
         }
 
+        /* Toast Notification Styles (Apple-inspired) */
+        #toast-container {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 2000; /* Above app-bar */
+        }
+
+        .toast {
+            background: rgba(28, 28, 30, 0.95); /* Matches app-bar */
+            backdrop-filter: blur(10px);
+            color: #fff;
+            padding: 12px 20px;
+            border-radius: 12px;
+            font-size: 0.9rem;
+            font-weight: 400;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+            margin-bottom: 10px;
+            opacity: 0;
+            transform: translateY(-10px);
+            animation: toastIn 0.3s ease forwards, toastOut 0.3s ease 2.7s forwards;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .toast.success::before {
+            content: "✓";
+            color: var(--toast-success);
+            font-weight: 600;
+        }
+
+        .toast.error::before {
+            content: "✗";
+            color: var(--toast-error);
+            font-weight: 600;
+        }
+
+        @keyframes toastIn {
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        @keyframes toastOut {
+            from { opacity: 1; transform: translateY(0); }
+            to { opacity: 0; transform: translateY(-10px); }
+        }
+
         @keyframes fadeIn {
             from { opacity: 0; }
             to { opacity: 1; }
@@ -228,6 +278,16 @@
             .app-bar h1 {
                 font-size: 1.3rem;
             }
+
+            #toast-container {
+                top: 10px;
+                right: 10px;
+            }
+
+            .toast {
+                padding: 10px 16px;
+                font-size: 0.85rem;
+            }
         }
 
         @media (max-width: 480px) {
@@ -245,7 +305,7 @@
             }
 
             .video-wrapper {
-                padding-top: 56.25%; /* Maintain 16:9 */
+                padding-top: 56.25%;
             }
 
             iframe {
@@ -287,6 +347,17 @@
             .pagination {
                 padding: 0 12px;
             }
+
+            #toast-container {
+                top: 10px;
+                right: 10px;
+                left: 10px; /* Full width on small screens */
+            }
+
+            .toast {
+                width: calc(100% - 20px);
+                margin: 0 auto 10px;
+            }
         }
     </style>
 </head>
@@ -304,34 +375,52 @@
     </div>
     <script>
         function deleteVideo(token) {
+            const videoItem = event.target.closest('.video-item');
+
+            // Create toast container if it doesn’t exist
+            let toastContainer = document.getElementById('toast-container');
+            if (!toastContainer) {
+                toastContainer = document.createElement('div');
+                toastContainer.id = 'toast-container';
+                document.body.appendChild(toastContainer);
+            }
+
+            function showToast(message, type) {
+                const toast = document.createElement('div');
+                toast.className = `toast ${type}`;
+                toast.textContent = message;
+                toastContainer.appendChild(toast);
+                setTimeout(() => {
+                    toast.remove();
+                }, 3000); // Remove after 3 seconds
+            }
+
             if (confirm('Are you sure you want to delete this video?')) {
                 fetch(`/videos/${token}`, { method: 'DELETE' })
                     .then(response => {
                         if (response.ok) {
                             console.log(`Deleted video with token: ${token}`);
-                            event.target.closest('.video-item').remove();
-                            window.location.reload()
+                            showToast('Video deleted successfully', 'success');
+                            videoItem.remove();
+                            updatePagination(); // Update pagination without reload
                         } else {
-                            videoInfo.innerHTML = '<p class="error">Failed to delete video</p>';
-                    setTimeout(() => {
-                        videoInfo.innerHTML = '';
-                    }, 2000);
-                            window.location.reload();
+                            showToast('Failed to delete video', 'error');
                         }
                     })
                     .catch(error => {
                         console.error('Error deleting video:', error);
-                        alert('Error deleting video');
+                        showToast('Error deleting video', 'error');
                     });
             }
         }
 
         const itemsPerPage = 21;
         let currentPage = 1;
-        const videoItems = document.querySelectorAll('.video-item');
+        let videoItems = document.querySelectorAll('.video-item');
 
         function updatePagination() {
-            const totalPages = Math.ceil(videoItems.length / itemsPerPage);
+            videoItems = document.querySelectorAll('.video-item'); // Refresh list after removal
+            const totalPages = Math.ceil(videoItems.length / itemsPerPage) || 1;
             const start = (currentPage - 1) * itemsPerPage;
             const end = start + itemsPerPage;
 
@@ -341,7 +430,7 @@
             });
 
             document.getElementById('prevBtn').disabled = currentPage === 1;
-            document.getElementById('nextBtn').disabled = currentPage === totalPages;
+            document.getElementById('nextBtn').disabled = currentPage >= totalPages;
         }
 
         document.getElementById('prevBtn').addEventListener('click', () => {
