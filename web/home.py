@@ -108,8 +108,13 @@ async def serve_video_player(request):
             logger.warning(f"Video ID not found in details for token: {token}")
             return web.Response(text="Video ID not found in details", status=404)
 
+        # Check for play=true query parameter
+        should_autoplay = request.query.get('play', '').lower() == 'true'
+
         hls_path = f"/hls/{video_id}/master.m3u8"
         video_title = video_details.get('title', 'Video Player')
+        logo_url = "https://example.com/logo.png"  # Replace with your actual logo URL
+
         html_content = f"""
         <!DOCTYPE html>
         <html>
@@ -259,7 +264,7 @@ async def serve_video_player(request):
         </head>
         <body>
             <div class="video-container">
-                <video id="video-player" class="video-js" controls preload="auto" autoplay muted>
+                <video id="video-player" class="video-js" controls preload="metadata">
                     <source src="{hls_path}" type="application/x-mpegURL">
                     Your browser does not support the video tag.
                 </video>
@@ -271,6 +276,8 @@ async def serve_video_player(request):
                 const player = videojs('video-player', {{
                     fluid: true,
                     responsive: true,
+                    autoplay: {str(should_autoplay).lower()},
+                    muted: {str(should_autoplay).lower()},
                     html5: {{
                         hls: {{
                             enableLowInitialPlaylist: true
@@ -288,7 +295,7 @@ async def serve_video_player(request):
                             seekBar: true
                         }},
                         audioTrackButton: true,
-                        textTrackButton: true  // Enable subtitle menu
+                        textTrackButton: true
                     }}
                 }});
 
@@ -297,11 +304,13 @@ async def serve_video_player(request):
                 }});
 
                 player.ready(function() {{
-                    player.play().catch(function(err) {{
-                        console.log('Autoplay failed:', err);
-                    }});
+                    // Only attempt to play if autoplay is explicitly enabled
+                    if ({str(should_autoplay).lower()}) {{
+                        player.play().catch(function(err) {{
+                            console.log('Autoplay failed:', err);
+                        }});
+                    }}
 
-                    // Audio track handling
                     player.on('loadedmetadata', function() {{
                         const audioTracks = player.audioTracks();
                         if (audioTracks && audioTracks.length > 0) {{
@@ -314,7 +323,6 @@ async def serve_video_player(request):
                             console.log('No audio tracks detected');
                         }}
 
-                        // Subtitle track handling
                         const textTracks = player.textTracks();
                         if (textTracks && textTracks.length > 0) {{
                             console.log('Subtitle tracks available:', textTracks.length);
@@ -322,7 +330,7 @@ async def serve_video_player(request):
                                 const track = textTracks[i];
                                 console.log('Subtitle track:', track.label, track.mode);
                                 if (track.mode === 'showing') {{
-                                    track.mode = 'showing';  // Ensure default subtitle is active
+                                    track.mode = 'showing';
                                 }}
                             }}
                         }} else {{
@@ -343,7 +351,6 @@ async def serve_video_player(request):
                     }});
                 }});
 
-                // Double-tap to seek
                 let lastTap = 0;
                 player.on('touchend', function(e) {{
                     const now = Date.now();
@@ -359,7 +366,6 @@ async def serve_video_player(request):
                     lastTap = now;
                 }});
 
-                // Drag to seek on video
                 let isDragging = false;
                 let startX, startTime;
                 player.on('touchstart', function(e) {{
@@ -382,24 +388,22 @@ async def serve_video_player(request):
                 player.on('touchend', function() {{
                     if (isDragging) {{
                         const seekTime = player.currentTime() - startTime;
-                        if (Math.abs(seekTime) > 1) {{  // Show seek info only for significant drags
+                        if (Math.abs(seekTime) > 1) {{
                             showSeekInfo(seekTime);
                         }}
                     }}
                     isDragging = false;
                 }});
 
-                // Seek info display function
                 function showSeekInfo(seekTime) {{
                     const seekInfo = document.getElementById('seek-info');
                     seekInfo.textContent = (seekTime > 0 ? '+' : '') + Math.round(seekTime) + 's';
                     seekInfo.classList.add('show');
                     setTimeout(() => {{
                         seekInfo.classList.remove('show');
-                    }}, 1000);  // Hide after 1 second
+                    }}, 1000);
                 }}
 
-                // Ensure logo and title stay above controls
                 player.on('loadedmetadata', function() {{
                     document.querySelector('.logo').style.zIndex = '1000';
                     document.querySelector('.video-title').style.zIndex = '1000';
