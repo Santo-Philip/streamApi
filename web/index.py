@@ -41,9 +41,16 @@ async def video_index(request):
             # Format created_at and calculate hours ago in IST
             if created_at != 'Unknown':
                 try:
-                    # Parse the created_at as UTC (assuming it’s stored as UTC in Supabase)
-                    dt_utc = datetime.fromisoformat(created_at.replace('Z', '+00:00'))
-                    dt_utc = pytz.utc.localize(dt_utc)  # Ensure it’s UTC-aware
+                    # Parse the created_at timestamp
+                    dt = datetime.fromisoformat(created_at.replace('Z', '+00:00'))
+
+                    # Check if dt is already timezone-aware
+                    if dt.tzinfo is None:
+                        # If naive, localize to UTC
+                        dt_utc = pytz.utc.localize(dt)
+                    else:
+                        # If already aware, use it as is (assuming UTC from Supabase)
+                        dt_utc = dt
 
                     # Convert to IST
                     dt_ist = dt_utc.astimezone(ist)
@@ -106,6 +113,7 @@ async def video_index(request):
     except Exception as e:
         logger.error(f"Error loading page: {str(e)}")
         return web.Response(text=f"Error loading page: {str(e)}", status=500)
+
 
 async def ban_user(request):
     try:
