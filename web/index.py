@@ -1,6 +1,5 @@
 import os
 import shutil
-
 from aiohttp import web
 from database.spbase import supabase
 from datetime import datetime
@@ -27,30 +26,35 @@ async def video_index(request):
         with open(file_path, "r", encoding="utf-8") as f:
             html_content = f.read()
 
+        # Define IST timezone
+        ist = pytz.timezone('Asia/Kolkata')
+
         # Generate video grid
         video_grid = ""
         for i, video in enumerate(videos):
-            video_url = video.get('token', '')
-            video_id = video.get('video','')
+            video_url = video.get('token', '')  # For streaming URL
+            video_id = video.get('video', '')   # For deletion (file_id)
             video_title = video.get('title', 'Untitled')
             created_at = video.get('created_at', 'Unknown')
             user = video.get('user', 'Unknown')
 
-            # Format created_at and calculate hours ago
+            # Format created_at and calculate hours ago in IST
             if created_at != 'Unknown':
                 try:
-                    # Parse the created_at as an offset-aware datetime
-                    dt = datetime.fromisoformat(created_at.replace('Z', '+00:00'))
+                    # Parse the created_at as UTC (assuming it’s stored as UTC in Supabase)
+                    dt_utc = datetime.fromisoformat(created_at.replace('Z', '+00:00'))
+                    dt_utc = pytz.utc.localize(dt_utc)  # Ensure it’s UTC-aware
 
-                    # Ensure current time is also offset-aware (UTC)
-                    now_utc = datetime.now(pytz.UTC)
+                    # Convert to IST
+                    dt_ist = dt_utc.astimezone(ist)
 
-                    # Format date and time
-                    date_str = dt.strftime("%B %d, %Y")  # e.g., "March 18, 2025"
-                    time_str = dt.strftime("%I:%M %p")  # e.g., "03:30 PM"
+                    # Format date and time in IST
+                    date_str = dt_ist.strftime("%B %d, %Y")  # e.g., "March 18, 2025"
+                    time_str = dt_ist.strftime("%I:%M %p")   # e.g., "09:00 AM"
 
-                    # Calculate hours ago
-                    hours_ago = int((now_utc - dt).total_seconds() / 3600)
+                    # Calculate hours ago in IST
+                    now_ist = datetime.now(ist)  # Current time in IST
+                    hours_ago = int((now_ist - dt_ist).total_seconds() / 3600)
                     hours_ago_str = f"Just now" if hours_ago == 0 else f"{hours_ago} hour{'s' if hours_ago != 1 else ''} ago"
                 except Exception as e:
                     logger.warning(f"Error formatting date for video {video_url}: {e}")
@@ -83,6 +87,7 @@ async def video_index(request):
                                 <span class="label">User:</span> <span>{user}</span>
                             </div>
                             <button class="delete-btn" onclick="deleteVideo('{video_id}')">Delete</button>
+                            <button class="ban-btn" onclick="banUser('{user}')">Ban User</button>
                         </div>
                     </div>
                 """
@@ -101,6 +106,24 @@ async def video_index(request):
     except Exception as e:
         logger.error(f"Error loading page: {str(e)}")
         return web.Response(text=f"Error loading page: {str(e)}", status=500)
+
+async def ban_user(request):
+    try:
+        user = request.match_info.get('user')
+        if not user:
+            return web.Response(text="User is required", status=400)
+
+        # Example: Add user to a banned_users table (adjust based on your schema)
+        response = supabase.table("banned_users").insert({"username": user}).execute()
+        if response.data:
+            logger.info(f"Successfully banned user: {user}")
+            return web.Response(text="User banned successfully", status=200)
+        else:
+            logger.warning(f"Failed to ban user: {user}")
+            return web.Response(text="Failed to ban user", status=500)
+    except Exception as e:
+        logger.error(f"Error banning user: {str(e)}")
+        return web.Response(text=f"Error banning user: {str(e)}", status=500)
 
 async def delete_video(request):
     try:
