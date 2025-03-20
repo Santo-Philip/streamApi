@@ -272,7 +272,7 @@
         });
 
         // WebSocket Connection
-        const ws = new WebSocket('wss://yourdomain.com/server-stats');
+        const ws = new WebSocket('wss://media.mehub.in/server-stats');
         ws.onmessage = (event) => {
             const stats = JSON.parse(event.data);
             const time = new Date().toLocaleTimeString();
