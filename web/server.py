@@ -30,7 +30,9 @@ async def get_server_stats():
     net = psutil.net_io_counters()
     bandwidth_sent_total = net.bytes_sent / 1024 / 1024  # MB
     bandwidth_recv_total = net.bytes_recv / 1024 / 1024  # MB
-    net_speed = psutil.net_if_stats().get('eth0', psutil._common.snicstats(True, 0, 0, 0)).speed / 1000  # Gbps
+    # Network speed (corrected)
+    net_stats = psutil.net_if_stats()
+    net_speed = net_stats.get('eth0', net_stats.get(next(iter(net_stats), None), None)).speed / 1000 if net_stats else 0  # Gbps, fallback to 0
 
     # Uptime
     uptime_seconds = time.time() - psutil.boot_time()
