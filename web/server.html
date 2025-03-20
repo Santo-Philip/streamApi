@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Server Stats</title>
+    <title>Server Stats - Media MeHub</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         * {
@@ -26,7 +26,6 @@
             to { opacity: 1; }
         }
 
-        /* App Bar */
         .app-bar {
             position: fixed;
             top: 0;
@@ -61,7 +60,6 @@
             margin-left: auto;
         }
 
-        /* Sidebar */
         .sidebar {
             position: fixed;
             top: 60px;
@@ -98,7 +96,6 @@
             opacity: 1;
         }
 
-        /* Main Content */
         .content {
             margin-left: 0;
             padding: 80px 20px 20px;
@@ -111,7 +108,6 @@
             margin-left: 250px;
         }
 
-        /* Overview Section */
         .overview {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
@@ -135,9 +131,11 @@
         }
 
         .stat-card .value {
-            font-size: 28px;
+            font-size: 24px;
             font-weight: 600;
             color: #fff;
+            display: block;
+            margin-bottom: 5px;
         }
 
         .stat-card .unit {
@@ -145,12 +143,17 @@
             color: #999;
         }
 
+        .stat-card .details {
+            font-size: 12px;
+            color: #bbb;
+            margin-top: 5px;
+        }
+
         @keyframes slideUp {
             from { transform: translateY(20px); opacity: 0; }
             to { transform: translateY(0); opacity: 1; }
         }
 
-        /* Grid Layout for Graphs */
         .grid-container {
             display: grid;
             grid-template-columns: repeat(2, 1fr);
@@ -179,7 +182,6 @@
             letter-spacing: 0.3px;
         }
 
-        /* Responsive Design */
         @media (max-width: 768px) {
             .grid-container {
                 grid-template-columns: 1fr;
@@ -226,14 +228,12 @@
     </style>
 </head>
 <body>
-    <!-- App Bar -->
     <div class="app-bar">
         <div class="logo"></div>
         <h1>Server Stats</h1>
         <span class="menu-btn" onclick="toggleSidebar()">☰</span>
     </div>
 
-    <!-- Sidebar -->
     <div class="sidebar" id="sidebar">
         <ul>
             <li><a href="#">Dashboard</a></li>
@@ -243,37 +243,40 @@
         </ul>
     </div>
 
-    <!-- Main Content -->
     <div class="content" id="content">
-        <!-- Overview Section -->
         <div class="overview">
             <div class="stat-card">
                 <h3>CPU Usage</h3>
                 <span class="value" id="cpuValue">0</span><span class="unit">%</span>
+                <span class="details" id="cpuDetails">0 CPUs @ 0 GHz</span>
             </div>
             <div class="stat-card">
                 <h3>RAM Usage</h3>
                 <span class="value" id="ramValue">0 / 0</span><span class="unit">GB</span>
+                <span class="details" id="ramDetails">0% Used</span>
             </div>
             <div class="stat-card">
                 <h3>Disk Usage</h3>
                 <span class="value" id="diskValue">0 / 0</span><span class="unit">GB</span>
+                <span class="details" id="diskDetails">0% Used</span>
             </div>
             <div class="stat-card">
                 <h3>Bandwidth Sent</h3>
                 <span class="value" id="bandwidthSentValue">0</span><span class="unit">MB</span>
+                <span class="details" id="bandwidthSentDetails">Total: 0 MB</span>
             </div>
             <div class="stat-card">
                 <h3>Bandwidth Received</h3>
                 <span class="value" id="bandwidthRecvValue">0</span><span class="unit">MB</span>
+                <span class="details" id="bandwidthRecvDetails">Total: 0 MB</span>
             </div>
             <div class="stat-card">
                 <h3>Uptime</h3>
-                <span class="value" id="uptimeValue">0</span><span class="unit">hours</span>
+                <span class="value" id="uptimeValue">0d 0h 0m 0s</span>
+                <span class="details">Since Last Boot</span>
             </div>
         </div>
 
-        <!-- Graphs -->
         <div class="grid-container">
             <div class="graph-container">
                 <h2>CPU Usage (%)</h2>
@@ -299,7 +302,6 @@
     </div>
 
     <script>
-        // Chart Configuration
         const chartOptions = {
             type: 'line',
             options: {
@@ -335,19 +337,42 @@
             data: { labels: [], datasets: [{ label: 'Received', data: [], borderColor: '#ff9500', fill: false }] }
         });
 
-        // WebSocket Connection
+        // Bandwidth tracking (simplified, total only)
+        let lastSent = 0, lastRecv = 0;
+        let dailySent = 0, dailyRecv = 0;
+
         const ws = new WebSocket('wss://media.mehub.in/server-stats');
         ws.onmessage = (event) => {
             const stats = JSON.parse(event.data);
             const time = new Date().toLocaleTimeString();
 
+            // Calculate daily bandwidth (difference from last reading)
+            if (lastSent > 0) {
+                dailySent += (stats.bandwidth_sent_total - lastSent);
+                dailyRecv += (stats.bandwidth_recv_total - lastRecv);
+            }
+            lastSent = stats.bandwidth_sent_total;
+            lastRecv = stats.bandwidth_recv_total;
+
             // Update Digital Stats
             document.getElementById('cpuValue').textContent = stats.cpu.toFixed(1);
-            document.getElementById('ramValue').textContent = `${(stats.ramUsed / 1024).toFixed(1)} / ${(stats.ramTotal / 1024).toFixed(1)}`;
-            document.getElementById('diskValue').textContent = `${(stats.diskUsed / 1024).toFixed(1)} / ${(stats.diskTotal / 1024).toFixed(1)}`;
-            document.getElementById('bandwidthSentValue').textContent = stats.bandwidth_sent.toFixed(1);
-            document.getElementById('bandwidthRecvValue').textContent = stats.bandwidth_recv.toFixed(1);
-            document.getElementById('uptimeValue').textContent = Math.floor(stats.uptime / 3600); // Hours
+            document.getElementById('cpuDetails').textContent = `${stats.cpu_count} CPUs @ ${stats.cpu_speed.toFixed(2)} GHz (${stats.cpu_model})`;
+            document.getElementById('ramValue').textContent = `${stats.ram_used.toFixed(1)} / ${stats.ram_total.toFixed(1)}`;
+            document.getElementById('ramDetails').textContent = `${stats.ram.toFixed(1)}% Used`;
+            document.getElementById('diskValue').textContent = `${stats.disk_used.toFixed(1)} / ${stats.disk_total.toFixed(1)}`;
+            document.getElementById('diskDetails').textContent = `${stats.disk.toFixed(1)}% Used`;
+            document.getElementById('bandwidthSentValue').textContent = dailySent.toFixed(1);
+            document.getElementById('bandwidthSentDetails').textContent = `Total: ${stats.bandwidth_sent_total.toFixed(1)} MB`;
+            document.getElementById('bandwidthRecvValue').textContent = dailyRecv.toFixed(1);
+            document.getElementById('bandwidthRecvDetails').textContent = `Total: ${stats.bandwidth_recv_total.toFixed(1)} MB`;
+
+            // Uptime in days, hours, minutes, seconds
+            const uptime = stats.uptime;
+            const days = Math.floor(uptime / 86400);
+            const hours = Math.floor((uptime % 86400) / 3600);
+            const minutes = Math.floor((uptime % 3600) / 60);
+            const seconds = Math.floor(uptime % 60);
+            document.getElementById('uptimeValue').textContent = `${days}d ${hours}h ${minutes}m ${seconds}s`;
 
             // Update Charts
             [cpuChart, ramChart, diskChart, bandwidthSentChart, bandwidthRecvChart].forEach((chart, index) => {
@@ -356,8 +381,8 @@
                     index === 0 ? stats.cpu :
                     index === 1 ? stats.ram :
                     index === 2 ? stats.disk :
-                    index === 3 ? stats.bandwidth_sent :
-                    stats.bandwidth_recv
+                    index === 3 ? stats.bandwidth_sent_total :
+                    stats.bandwidth_recv_total
                 );
                 if (chart.data.labels.length > 20) {
                     chart.data.labels.shift();
@@ -368,7 +393,6 @@
         };
         ws.onerror = (error) => console.error('WebSocket error:', error);
 
-        // Sidebar Toggle
         function toggleSidebar() {
             const sidebar = document.getElementById('sidebar');
             const content = document.getElementById('content');
