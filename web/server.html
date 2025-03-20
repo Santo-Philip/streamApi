@@ -103,30 +103,46 @@
             margin-left: 0;
             padding: 80px 20px 20px;
             transition: margin-left 0.3s ease;
+            max-width: 1200px;
+            margin: 80px auto 20px;
         }
 
         .content.shifted {
             margin-left: 250px;
         }
 
-        /* Grid Layout for Graphs */
-        .grid-container {
+        /* Overview Section */
+        .overview {
             display: grid;
-            grid-template-columns: repeat(2, 1fr); /* 2x2 grid on desktop */
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
             gap: 20px;
-            max-width: 1200px;
-            margin: 0 auto;
+            margin-bottom: 40px;
         }
 
-        .graph-container {
+        .stat-card {
             background: rgba(40, 40, 40, 0.8);
             border-radius: 12px;
             padding: 20px;
+            text-align: center;
             box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
             animation: slideUp 0.5s ease;
-            height: 300px; /* Fixed height for visibility */
-            display: flex;
-            flex-direction: column;
+        }
+
+        .stat-card h3 {
+            font-size: 16px;
+            color: #ccc;
+            margin-bottom: 10px;
+        }
+
+        .stat-card .value {
+            font-size: 28px;
+            font-weight: 600;
+            color: #fff;
+        }
+
+        .stat-card .unit {
+            font-size: 14px;
+            color: #999;
         }
 
         @keyframes slideUp {
@@ -134,14 +150,31 @@
             to { transform: translateY(0); opacity: 1; }
         }
 
+        /* Grid Layout for Graphs */
+        .grid-container {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 20px;
+        }
+
+        .graph-container {
+            background: rgba(40, 40, 40, 0.8);
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+            height: 350px;
+            display: flex;
+            flex-direction: column;
+        }
+
         canvas {
             width: 100% !important;
-            height: 100% !important; /* Ensure canvas fills container */
+            height: 100% !important;
         }
 
         h2 {
             font-size: 20px;
-            margin-bottom: 10px;
+            margin-bottom: 15px;
             color: #f5f5f5;
             letter-spacing: 0.3px;
         }
@@ -149,7 +182,7 @@
         /* Responsive Design */
         @media (max-width: 768px) {
             .grid-container {
-                grid-template-columns: 1fr; /* Single column on mobile */
+                grid-template-columns: 1fr;
             }
 
             .sidebar {
@@ -169,7 +202,7 @@
             }
 
             .graph-container {
-                height: 250px; /* Slightly smaller on mobile */
+                height: 300px;
             }
         }
 
@@ -183,8 +216,11 @@
             }
 
             .graph-container {
-                padding: 10px;
-                height: 200px;
+                height: 250px;
+            }
+
+            .overview {
+                grid-template-columns: 1fr;
             }
         }
     </style>
@@ -209,6 +245,35 @@
 
     <!-- Main Content -->
     <div class="content" id="content">
+        <!-- Overview Section -->
+        <div class="overview">
+            <div class="stat-card">
+                <h3>CPU Usage</h3>
+                <span class="value" id="cpuValue">0</span><span class="unit">%</span>
+            </div>
+            <div class="stat-card">
+                <h3>RAM Usage</h3>
+                <span class="value" id="ramValue">0 / 0</span><span class="unit">GB</span>
+            </div>
+            <div class="stat-card">
+                <h3>Disk Usage</h3>
+                <span class="value" id="diskValue">0 / 0</span><span class="unit">GB</span>
+            </div>
+            <div class="stat-card">
+                <h3>Bandwidth Sent</h3>
+                <span class="value" id="bandwidthSentValue">0</span><span class="unit">MB</span>
+            </div>
+            <div class="stat-card">
+                <h3>Bandwidth Received</h3>
+                <span class="value" id="bandwidthRecvValue">0</span><span class="unit">MB</span>
+            </div>
+            <div class="stat-card">
+                <h3>Uptime</h3>
+                <span class="value" id="uptimeValue">0</span><span class="unit">hours</span>
+            </div>
+        </div>
+
+        <!-- Graphs -->
         <div class="grid-container">
             <div class="graph-container">
                 <h2>CPU Usage (%)</h2>
@@ -226,7 +291,6 @@
                 <h2>Bandwidth Sent (MB)</h2>
                 <canvas id="bandwidthSentChart"></canvas>
             </div>
-            <!-- Bandwidth Received moved below on mobile -->
             <div class="graph-container">
                 <h2>Bandwidth Received (MB)</h2>
                 <canvas id="bandwidthRecvChart"></canvas>
@@ -272,12 +336,20 @@
         });
 
         // WebSocket Connection
-        const ws = new WebSocket('wss://media.mehub.in/server-stats');
+        const ws = new WebSocket('wss://yourdomain.com/server-stats');
         ws.onmessage = (event) => {
             const stats = JSON.parse(event.data);
             const time = new Date().toLocaleTimeString();
 
-            // Update all charts
+            // Update Digital Stats
+            document.getElementById('cpuValue').textContent = stats.cpu.toFixed(1);
+            document.getElementById('ramValue').textContent = `${(stats.ramUsed / 1024).toFixed(1)} / ${(stats.ramTotal / 1024).toFixed(1)}`;
+            document.getElementById('diskValue').textContent = `${(stats.diskUsed / 1024).toFixed(1)} / ${(stats.diskTotal / 1024).toFixed(1)}`;
+            document.getElementById('bandwidthSentValue').textContent = stats.bandwidth_sent.toFixed(1);
+            document.getElementById('bandwidthRecvValue').textContent = stats.bandwidth_recv.toFixed(1);
+            document.getElementById('uptimeValue').textContent = Math.floor(stats.uptime / 3600); // Hours
+
+            // Update Charts
             [cpuChart, ramChart, diskChart, bandwidthSentChart, bandwidthRecvChart].forEach((chart, index) => {
                 chart.data.labels.push(time);
                 chart.data.datasets[0].data.push(
