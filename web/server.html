@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Server Stats</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        canvas { max-width: 600px; margin: 20px auto; }
+    </style>
+</head>
+<body>
+    <h1>Server Statistics</h1>
+    <canvas id="statsChart"></canvas>
+    <script>
+        const ctx = document.getElementById('statsChart').getContext('2d');
+        const chart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: [],
+                datasets: [
+                    { label: 'CPU (%)', data: [], borderColor: 'red', fill: false },
+                    { label: 'RAM (%)', data: [], borderColor: 'blue', fill: false },
+                    { label: 'Disk (%)', data: [], borderColor: 'green', fill: false },
+                    { label: 'Bandwidth Sent (MB)', data: [], borderColor: 'purple', fill: false },
+                    { label: 'Bandwidth Recv (MB)', data: [], borderColor: 'orange', fill: false }
+                ]
+            },
+            options: {
+                scales: { x: { title: { display: true, text: 'Time' } }, y: { beginAtZero: true } }
+            }
+        });
+
+        const ws = new WebSocket('ws://yourdomain.com:8080/server-stats');
+        ws.onmessage = (event) => {
+            const stats = JSON.parse(event.data);
+            const time = new Date().toLocaleTimeString();
+
+            // Update chart
+            chart.data.labels.push(time);
+            chart.data.datasets[0].data.push(stats.cpu);
+            chart.data.datasets[1].data.push(stats.ram);
+            chart.data.datasets[2].data.push(stats.disk);
+            chart.data.datasets[3].data.push(stats.bandwidth_sent);
+            chart.data.datasets[4].data.push(stats.bandwidth_recv);
+
+            // Limit to 20 data points
+            if (chart.data.labels.length > 20) {
+                chart.data.labels.shift();
+                chart.data.datasets.forEach(dataset => dataset.data.shift());
+            }
+            chart.update();
+        };
+    </script>
+</body>
+</html>
