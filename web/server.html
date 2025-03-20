@@ -63,15 +63,6 @@
             margin-left: auto;
         }
 
-        .date-picker {
-            margin-left: 20px;
-            padding: 5px;
-            background: rgba(40, 40, 40, 0.9);
-            border: 1px solid #555;
-            color: #fff;
-            border-radius: 5px;
-        }
-
         .sidebar {
             position: fixed;
             top: 60px;
@@ -408,7 +399,6 @@
     <div class="app-bar">
         <div class="logo"></div>
         <h1>Server Stats</h1>
-        <input type="date" id="datePicker" class="date-picker">
         <span class="menu-btn" onclick="toggleSidebar()">☰</span>
     </div>
 
@@ -529,24 +519,16 @@
         };
 
         let lastSent = 0, lastRecv = 0;
-        let ws = new WebSocket('wss://media.mehub.in/server-stats');
+        let dailySent = 0, dailyRecv = 0;
 
-        function updateStats(stats) {
+        const ws = new WebSocket('wss://media.mehub.in/server-stats');
+        ws.onmessage = (event) => {
+            const stats = JSON.parse(event.data);
             const time = new Date().toLocaleTimeString();
-            const isLive = !stats.server_time.includes('N/A');
 
-            if (isLive && lastSent > 0) {
-                const dailySent = stats.daily_sent_mb - lastSent;
-                const dailyRecv = stats.daily_recv_mb - lastRecv;
-                document.getElementById('bandwidthSentValue').textContent = dailySent.toFixed(1);
-                document.getElementById('bandwidthRecvValue').textContent = dailyRecv.toFixed(1);
-                document.getElementById('bandwidthSentDetails').innerHTML = `GB: ${(dailySent / 1024).toFixed(2)}<br>TB: ${(dailySent / 1024 / 1024).toFixed(3)}<br>Total: ${stats.bandwidth_sent_total_mb.toFixed(1)} MB`;
-                document.getElementById('bandwidthRecvDetails').innerHTML = `GB: ${(dailyRecv / 1024).toFixed(2)}<br>TB: ${(dailyRecv / 1024 / 1024).toFixed(3)}<br>Total: ${stats.bandwidth_recv_total_mb.toFixed(1)} MB`;
-            } else {
-                document.getElementById('bandwidthSentValue').textContent = stats.daily_sent_mb.toFixed(1);
-                document.getElementById('bandwidthRecvValue').textContent = stats.daily_recv_mb.toFixed(1);
-                document.getElementById('bandwidthSentDetails').innerHTML = `GB: ${(stats.daily_sent_mb / 1024).toFixed(2)}<br>TB: ${(stats.daily_sent_mb / 1024 / 1024).toFixed(3)}<br>Total: ${stats.bandwidth_sent_total_mb.toFixed(1)} MB`;
-                document.getElementById('bandwidthRecvDetails').innerHTML = `GB: ${(stats.daily_recv_mb / 1024).toFixed(2)}<br>TB: ${(stats.daily_recv_mb / 1024 / 1024).toFixed(3)}<br>Total: ${stats.bandwidth_recv_total_mb.toFixed(1)} MB`;
+            if (lastSent > 0) {
+                dailySent += (stats.bandwidth_sent_total_mb - lastSent);
+                dailyRecv += (stats.bandwidth_recv_total_mb - lastRecv);
             }
             lastSent = stats.bandwidth_sent_total_mb;
             lastRecv = stats.bandwidth_recv_total_mb;
@@ -561,6 +543,12 @@
             document.getElementById('diskValue').textContent = `${stats.disk_used_gb.toFixed(1)} / ${stats.disk_total_gb.toFixed(1)}`;
             document.getElementById('diskDetails').innerHTML = `MB: ${stats.disk_used_mb.toFixed(1)} / ${stats.disk_total_mb.toFixed(1)}<br>TB: ${stats.disk_used_tb.toFixed(3)} / ${stats.disk_total_tb.toFixed(3)}<br>${stats.disk.toFixed(1)}% Used`;
 
+            document.getElementById('bandwidthSentValue').textContent = dailySent.toFixed(1);
+            document.getElementById('bandwidthSentDetails').innerHTML = `GB: ${(dailySent / 1024).toFixed(2)}<br>TB: ${(dailySent / 1024 / 1024).toFixed(3)}<br>Total: ${stats.bandwidth_sent_total_mb.toFixed(1)} MB`;
+
+            document.getElementById('bandwidthRecvValue').textContent = dailyRecv.toFixed(1);
+            document.getElementById('bandwidthRecvDetails').innerHTML = `GB: ${(dailyRecv / 1024).toFixed(2)}<br>TB: ${(dailyRecv / 1024 / 1024).toFixed(3)}<br>Total: ${stats.bandwidth_recv_total_mb.toFixed(1)} MB`;
+
             const uptime = stats.uptime;
             const days = Math.floor(uptime / 86400);
             const hours = Math.floor((uptime % 86400) / 3600);
@@ -574,49 +562,24 @@
             document.getElementById('serverTimeValue').textContent = stats.server_time;
             document.getElementById('timeDetails').innerHTML = `TZ: ${stats.timezone}<br>Boot: ${stats.boot_time}`;
 
-            if (isLive) {
-                Object.values(charts).forEach((chart, index) => {
-                    chart.data.labels.push(time);
-                    chart.data.datasets[0].data.push(
-                        index === 0 ? stats.cpu :
-                        index === 1 ? stats.ram :
-                        index === 2 ? stats.disk :
-                        index === 3 ? stats.bandwidth_sent_total_mb :
-                        stats.bandwidth_recv_total_mb
-                    );
-                    if (chart.data.labels.length > 20) {
-                        chart.data.labels.shift();
-                        chart.data.datasets[0].data.shift();
-                    }
-                    chart.update();
-                });
-            } else {
-                Object.values(charts).forEach(chart => {
-                    chart.data.labels = [stats.server_time];
-                    chart.data.datasets[0].data = [chart === charts.cpu ? stats.cpu : chart === charts.ram ? stats.ram : chart === charts.disk ? stats.disk : chart === charts.bandwidthSent ? stats.daily_sent_mb : stats.daily_recv_mb];
-                    chart.update();
-                });
-            }
-        }
-
-        ws.onmessage = (event) => {
-            const stats = JSON.parse(event.data);
-            updateStats(stats);
+            Object.values(charts).forEach((chart, index) => {
+                chart.data.labels.push(time);
+                chart.data.datasets[0].data.push(
+                    index === 0 ? stats.cpu :
+                    index === 1 ? stats.ram :
+                    index === 2 ? stats.disk :
+                    index === 3 ? stats.bandwidth_sent_total_mb :
+                    stats.bandwidth_recv_total_mb
+                );
+                if (chart.data.labels.length > 20) {
+                    chart.data.labels.shift();
+                    chart.data.datasets[0].data.shift();
+                }
+                chart.update();
+            });
         };
 
         ws.onerror = (error) => console.error('WebSocket error:', error);
-
-        document.getElementById('datePicker').addEventListener('change', async (e) => {
-            const selectedDate = e.target.value;
-            if (selectedDate) {
-                ws.close();
-                const response = await fetch(`https://media.mehub.in/server-stats?date=${selectedDate}`, { method: 'GET' });
-                const stats = await response.json();
-                if (stats) updateStats(stats);
-                ws = new WebSocket('wss://media.mehub.in/server-stats');
-                ws.onmessage = (event) => updateStats(JSON.parse(event.data));
-            }
-        });
 
         function toggleSidebar() {
             const sidebar = document.getElementById('sidebar');
