@@ -20,12 +20,6 @@
             color: #fff;
             min-height: 100vh;
             overflow-x: hidden;
-            animation: fadeIn 1s ease-in;
-        }
-
-        @keyframes fadeIn {
-            from { opacity: 0; }
-            to { opacity: 1; }
         }
 
         .app-bar {
@@ -127,7 +121,6 @@
             box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5), inset 0 0 10px rgba(255, 255, 255, 0.1);
             position: relative;
             overflow: hidden;
-            animation: slideUp 0.5s ease;
         }
 
         .stat-card::before {
@@ -197,9 +190,34 @@
             line-height: 1.4;
         }
 
-        @keyframes slideUp {
-            from { transform: translateY(20px); opacity: 0; }
+        /* Unique Animations */
+        .stat-card:nth-child(1) { animation: slideInLeft 0.8s ease-out; }
+        .stat-card:nth-child(2) { animation: slideInRight 0.8s ease-out; }
+        .stat-card:nth-child(3) { animation: fadeInUp 0.8s ease-out; }
+        .stat-card:nth-child(4) { animation: zoomIn 0.8s ease-out; }
+        .stat-card:nth-child(5) { animation: slideInLeft 0.8s ease-out 0.2s; }
+        .stat-card:nth-child(6) { animation: slideInRight 0.8s ease-out 0.2s; }
+        .stat-card:nth-child(7) { animation: fadeInUp 0.8s ease-out 0.4s; }
+        .stat-card:nth-child(8) { animation: zoomIn 0.8s ease-out 0.4s; }
+
+        @keyframes slideInLeft {
+            from { transform: translateX(-100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+
+        @keyframes slideInRight {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+
+        @keyframes fadeInUp {
+            from { transform: translateY(50px); opacity: 0; }
             to { transform: translateY(0); opacity: 1; }
+        }
+
+        @keyframes zoomIn {
+            from { transform: scale(0.5); opacity: 0; }
+            to { transform: scale(1); opacity: 1; }
         }
 
         .grid-container {
@@ -216,6 +234,7 @@
             height: 350px;
             display: flex;
             flex-direction: column;
+            animation: fadeIn 1s ease-in;
         }
 
         canvas {
@@ -309,14 +328,14 @@
                 <h3>RAM Usage</h3>
                 <div class="gauge" style="--percent: 0%;"></div>
                 <span class="value" id="ramValue">0 / 0</span><span class="unit">GB</span>
-                <span class="details" id="ramDetails">0% Used</span>
+                <span class="details" id="ramDetails">MB: 0 / 0<br>TB: 0 / 0<br>0% Used</span>
             </div>
             <div class="stat-card" id="diskCard">
                 <i class="fas fa-hdd icon"></i>
                 <h3>Disk Usage</h3>
                 <div class="gauge" style="--percent: 0%;"></div>
                 <span class="value" id="diskValue">0 / 0</span><span class="unit">GB</span>
-                <span class="details" id="diskDetails">0% Used</span>
+                <span class="details" id="diskDetails">MB: 0 / 0<br>TB: 0 / 0<br>0% Used</span>
             </div>
             <div class="stat-card" id="bandwidthSentCard">
                 <i class="fas fa-upload icon"></i>
@@ -421,31 +440,31 @@
             const time = new Date().toLocaleTimeString();
 
             if (lastSent > 0) {
-                dailySent += (stats.bandwidth_sent_total - lastSent);
-                dailyRecv += (stats.bandwidth_recv_total - lastRecv);
+                dailySent += (stats.bandwidth_sent_total_mb - lastSent);
+                dailyRecv += (stats.bandwidth_recv_total_mb - lastRecv);
             }
-            lastSent = stats.bandwidth_sent_total;
-            lastRecv = stats.bandwidth_recv_total;
+            lastSent = stats.bandwidth_sent_total_mb;
+            lastRecv = stats.bandwidth_recv_total_mb;
 
             document.getElementById('cpuCard').querySelector('.gauge').style.setProperty('--percent', `${stats.cpu}%`);
             document.getElementById('cpuValue').textContent = stats.cpu.toFixed(1);
             document.getElementById('cpuDetails').innerHTML = `${stats.cpu_count} CPUs @ ${stats.cpu_speed.toFixed(2)} GHz<br>Temp: ${stats.cpu_temp.toFixed(1)}°C<br>Load: ${stats.load_avg.toFixed(2)}`;
 
             document.getElementById('ramCard').querySelector('.gauge').style.setProperty('--percent', `${stats.ram}%`);
-            document.getElementById('ramValue').textContent = `${stats.ram_used.toFixed(1)} / ${stats.ram_total.toFixed(1)}`;
-            document.getElementById('ramDetails').textContent = `${stats.ram.toFixed(1)}% Used`;
+            document.getElementById('ramValue').textContent = `${stats.ram_used_gb.toFixed(1)} / ${stats.ram_total_gb.toFixed(1)}`;
+            document.getElementById('ramDetails').innerHTML = `MB: ${stats.ram_used_mb.toFixed(1)} / ${stats.ram_total_mb.toFixed(1)}<br>TB: ${stats.ram_used_tb.toFixed(3)} / ${stats.ram_total_tb.toFixed(3)}<br>${stats.ram.toFixed(1)}% Used`;
 
             document.getElementById('diskCard').querySelector('.gauge').style.setProperty('--percent', `${stats.disk}%`);
-            document.getElementById('diskValue').textContent = `${stats.disk_used.toFixed(1)} / ${stats.disk_total.toFixed(1)}`;
-            document.getElementById('diskDetails').textContent = `${stats.disk.toFixed(1)}% Used`;
+            document.getElementById('diskValue').textContent = `${stats.disk_used_gb.toFixed(1)} / ${stats.disk_total_gb.toFixed(1)}`;
+            document.getElementById('diskDetails').innerHTML = `MB: ${stats.disk_used_mb.toFixed(1)} / ${stats.disk_total_mb.toFixed(1)}<br>TB: ${stats.disk_used_tb.toFixed(3)} / ${stats.disk_total_tb.toFixed(3)}<br>${stats.disk.toFixed(1)}% Used`;
 
             document.getElementById('bandwidthSentCard').querySelector('.gauge').style.setProperty('--percent', '50%');
             document.getElementById('bandwidthSentValue').textContent = dailySent.toFixed(1);
-            document.getElementById('bandwidthSentDetails').innerHTML = `GB: ${(dailySent / 1024).toFixed(2)}<br>TB: ${(dailySent / 1024 / 1024).toFixed(3)}<br>Total: ${stats.bandwidth_sent_total.toFixed(1)} MB`;
+            document.getElementById('bandwidthSentDetails').innerHTML = `GB: ${(dailySent / 1024).toFixed(2)}<br>TB: ${(dailySent / 1024 / 1024).toFixed(3)}<br>Total: ${stats.bandwidth_sent_total_mb.toFixed(1)} MB`;
 
             document.getElementById('bandwidthRecvCard').querySelector('.gauge').style.setProperty('--percent', '50%');
             document.getElementById('bandwidthRecvValue').textContent = dailyRecv.toFixed(1);
-            document.getElementById('bandwidthRecvDetails').innerHTML = `GB: ${(dailyRecv / 1024).toFixed(2)}<br>TB: ${(dailyRecv / 1024 / 1024).toFixed(3)}<br>Total: ${stats.bandwidth_recv_total.toFixed(1)} MB`;
+            document.getElementById('bandwidthRecvDetails').innerHTML = `GB: ${(dailyRecv / 1024).toFixed(2)}<br>TB: ${(dailyRecv / 1024 / 1024).toFixed(3)}<br>Total: ${stats.bandwidth_recv_total_mb.toFixed(1)} MB`;
 
             const uptime = stats.uptime;
             const days = Math.floor(uptime / 86400);
@@ -466,8 +485,8 @@
                     index === 0 ? stats.cpu :
                     index === 1 ? stats.ram :
                     index === 2 ? stats.disk :
-                    index === 3 ? stats.bandwidth_sent_total :
-                    stats.bandwidth_recv_total
+                    index === 3 ? stats.bandwidth_sent_total_mb :
+                    stats.bandwidth_recv_total_mb
                 );
                 if (chart.data.labels.length > 20) {
                     chart.data.labels.shift();

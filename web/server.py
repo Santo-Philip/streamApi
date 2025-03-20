@@ -2,13 +2,14 @@ from aiohttp import web
 import psutil
 import asyncio
 import os
+import json
 import time
 import platform
 import sqlite3
 from datetime import datetime
 
-# SQLite3 Setup
-DB_FILE = '/root/streamApi/web/server_stats.db'
+# SQLite3 Setup - Dynamic path based on server.py location
+DB_FILE = os.path.join(os.path.dirname(__file__), 'server_stats.db')
 
 def init_db():
     conn = sqlite3.connect(DB_FILE)
@@ -46,22 +47,34 @@ async def get_server_stats():
 
     # RAM
     ram = psutil.virtual_memory()
-    ram_used = ram.used / 1024 / 1024 / 1024  # GB
-    ram_total = ram.total / 1024 / 1024 / 1024  # GB
+    ram_used_mb = ram.used / 1024 / 1024  # MB
+    ram_total_mb = ram.total / 1024 / 1024  # MB
+    ram_used_gb = ram.used / 1024 / 1024 / 1024  # GB
+    ram_total_gb = ram.total / 1024 / 1024 / 1024  # GB
+    ram_used_tb = ram.used / 1024 / 1024 / 1024 / 1024  # TB
+    ram_total_tb = ram.total / 1024 / 1024 / 1024 / 1024  # TB
 
     # Disk
     disk = psutil.disk_usage('/')
-    disk_used = disk.used / 1024 / 1024 / 1024  # GB
-    disk_total = disk.total / 1024 / 1024 / 1024  # GB
+    disk_used_mb = disk.used / 1024 / 1024  # MB
+    disk_total_mb = disk.total / 1024 / 1024  # MB
+    disk_used_gb = disk.used / 1024 / 1024 / 1024  # GB
+    disk_total_gb = disk.total / 1024 / 1024 / 1024  # GB
+    disk_used_tb = disk.used / 1024 / 1024 / 1024 / 1024  # TB
+    disk_total_tb = disk.total / 1024 / 1024 / 1024 / 1024  # TB
 
     # Bandwidth
     net = psutil.net_io_counters()
-    bandwidth_sent_total = net.bytes_sent / 1024 / 1024  # MB
-    bandwidth_recv_total = net.bytes_recv / 1024 / 1024  # MB
+    bandwidth_sent_total_mb = net.bytes_sent / 1024 / 1024  # MB
+    bandwidth_recv_total_mb = net.bytes_recv / 1024 / 1024  # MB
+    bandwidth_sent_total_gb = net.bytes_sent / 1024 / 1024 / 1024  # GB
+    bandwidth_recv_total_gb = net.bytes_recv / 1024 / 1024 / 1024  # GB
+    bandwidth_sent_total_tb = net.bytes_sent / 1024 / 1024 / 1024 / 1024  # TB
+    bandwidth_recv_total_tb = net.bytes_recv / 1024 / 1024 / 1024 / 1024  # TB
     # Network speed (fixed)
     net_stats = psutil.net_if_stats()
-    default_interface = next(iter(net_stats), 'eth0')  # Use first available interface
-    net_speed = net_stats.get(default_interface, psutil._common.snicstats(True, 0, 0, 0)).speed / 1000 if net_stats else 0  # Gbps
+    default_interface = next(iter(net_stats), None)
+    net_speed = net_stats[default_interface].speed / 1000 if default_interface and net_stats[default_interface].speed else 0  # Gbps
 
     # Uptime
     uptime_seconds = time.time() - psutil.boot_time()
@@ -82,13 +95,25 @@ async def get_server_stats():
         'cpu_temp': cpu_temp,
         'load_avg': load_avg[0],
         'ram': ram.percent,
-        'ram_used': ram_used,
-        'ram_total': ram_total,
+        'ram_used_mb': ram_used_mb,
+        'ram_total_mb': ram_total_mb,
+        'ram_used_gb': ram_used_gb,
+        'ram_total_gb': ram_total_gb,
+        'ram_used_tb': ram_used_tb,
+        'ram_total_tb': ram_total_tb,
         'disk': disk.percent,
-        'disk_used': disk_used,
-        'disk_total': disk_total,
-        'bandwidth_sent_total': bandwidth_sent_total,
-        'bandwidth_recv_total': bandwidth_recv_total,
+        'disk_used_mb': disk_used_mb,
+        'disk_total_mb': disk_total_mb,
+        'disk_used_gb': disk_used_gb,
+        'disk_total_gb': disk_total_gb,
+        'disk_used_tb': disk_used_tb,
+        'disk_total_tb': disk_total_tb,
+        'bandwidth_sent_total_mb': bandwidth_sent_total_mb,
+        'bandwidth_recv_total_mb': bandwidth_recv_total_mb,
+        'bandwidth_sent_total_gb': bandwidth_sent_total_gb,
+        'bandwidth_recv_total_gb': bandwidth_recv_total_gb,
+        'bandwidth_sent_total_tb': bandwidth_sent_total_tb,
+        'bandwidth_recv_total_tb': bandwidth_recv_total_tb,
         'net_speed': net_speed,
         'uptime': uptime_seconds,
         'connections': connections,
@@ -104,8 +129,8 @@ async def get_server_stats():
                  disk, disk_used, disk_total, bandwidth_sent_total, bandwidth_recv_total, net_speed, connections)
                  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
               (int(time.time()), stats['cpu'], stats['cpu_count'], stats['cpu_speed'], stats['cpu_temp'], stats['load_avg'],
-               stats['ram'], stats['ram_used'], stats['ram_total'], stats['disk'], stats['disk_used'], stats['disk_total'],
-               stats['bandwidth_sent_total'], stats['bandwidth_recv_total'], stats['net_speed'], stats['connections']))
+               stats['ram'], stats['ram_used_gb'], stats['ram_total_gb'], stats['disk'], stats['disk_used_gb'], stats['disk_total_gb'],
+               stats['bandwidth_sent_total_mb'], stats['bandwidth_recv_total_mb'], stats['net_speed'], stats['connections']))
     conn.commit()
     conn.close()
 
@@ -124,4 +149,6 @@ async def index_handler(request):
     file_path = os.path.join(os.path.dirname(__file__), 'server.html')
     with open(file_path, 'r') as f:
         return web.Response(text=f.read(), content_type='text/html')
+
+
 init_db()
