@@ -15,11 +15,16 @@
             font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", sans-serif;
         }
 
+        html {
+            scroll-behavior: smooth; /* Smooth scrolling for the entire page */
+        }
+
         body {
             background: linear-gradient(135deg, #1a1a1a, #000);
             color: #fff;
             min-height: 100vh;
             overflow-x: hidden;
+            overflow-y: auto; /* Ensure vertical scrolling is enabled */
         }
 
         .app-bar {
@@ -153,6 +158,7 @@
             margin-bottom: 10px;
         }
 
+        /* CPU Gauge */
         .stat-card .gauge {
             width: 100px;
             height: 50px;
@@ -166,9 +172,49 @@
             position: absolute;
             width: 100%;
             height: 100%;
-            background: conic-gradient(#007aff var(--percent), #333 0);
+            background: conic-gradient(#ff3b30 var(--percent), #333 0);
             border-radius: 50px 50px 0 0;
             transform: rotate(180deg);
+            transition: background 0.5s ease-in-out; /* Smooth gauge fill */
+        }
+
+        /* Other Card Animations */
+        .stat-card .pulse {
+            width: 60px;
+            height: 60px;
+            margin: 0 auto 10px;
+            background: radial-gradient(circle, #007aff 10%, transparent 70%);
+            border-radius: 50%;
+            animation: pulseEffect 1.5s infinite ease-in-out;
+        }
+
+        .stat-card .wave {
+            width: 80px;
+            height: 20px;
+            margin: 0 auto 10px;
+            background: linear-gradient(90deg, #34c759, #007aff);
+            border-radius: 10px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .stat-card .wave::before {
+            content: '';
+            position: absolute;
+            width: 200%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.4), transparent);
+            animation: waveEffect 2s infinite linear;
+        }
+
+        .stat-card .spin {
+            width: 50px;
+            height: 50px;
+            margin: 0 auto 10px;
+            border: 4px solid #af52de;
+            border-top: 4px solid #ff9500;
+            border-radius: 50%;
+            animation: spinEffect 1.2s infinite linear;
         }
 
         .stat-card .value {
@@ -188,9 +234,10 @@
             color: #bbb;
             margin-top: 5px;
             line-height: 1.4;
+            transition: opacity 0.3s ease;
         }
 
-        /* Unique Animations */
+        /* Card Entry Animations */
         .stat-card:nth-child(1) { animation: slideInLeft 0.8s ease-out; }
         .stat-card:nth-child(2) { animation: slideInRight 0.8s ease-out; }
         .stat-card:nth-child(3) { animation: fadeInUp 0.8s ease-out; }
@@ -220,6 +267,22 @@
             to { transform: scale(1); opacity: 1; }
         }
 
+        @keyframes pulseEffect {
+            0% { transform: scale(1); opacity: 0.8; }
+            50% { transform: scale(1.1); opacity: 1; }
+            100% { transform: scale(1); opacity: 0.8; }
+        }
+
+        @keyframes waveEffect {
+            0% { transform: translateX(-100%); }
+            100% { transform: translateX(100%); }
+        }
+
+        @keyframes spinEffect {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
         .grid-container {
             display: grid;
             grid-template-columns: repeat(2, 1fr);
@@ -235,6 +298,11 @@
             display: flex;
             flex-direction: column;
             animation: fadeIn 1s ease-in;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
         }
 
         canvas {
@@ -292,7 +360,7 @@
                 grid-template-columns: 1fr;
             }
 
-            .stat-card .gauge {
+            .stat-card .gauge, .stat-card .pulse, .stat-card .wave, .stat-card .spin {
                 width: 80px;
             }
         }
@@ -326,46 +394,49 @@
             <div class="stat-card" id="ramCard">
                 <i class="fas fa-memory icon"></i>
                 <h3>RAM Usage</h3>
-                <div class="gauge" style="--percent: 0%;"></div>
+                <div class="pulse"></div>
                 <span class="value" id="ramValue">0 / 0</span><span class="unit">GB</span>
                 <span class="details" id="ramDetails">MB: 0 / 0<br>TB: 0 / 0<br>0% Used</span>
             </div>
             <div class="stat-card" id="diskCard">
                 <i class="fas fa-hdd icon"></i>
                 <h3>Disk Usage</h3>
-                <div class="gauge" style="--percent: 0%;"></div>
+                <div class="wave"></div>
                 <span class="value" id="diskValue">0 / 0</span><span class="unit">GB</span>
                 <span class="details" id="diskDetails">MB: 0 / 0<br>TB: 0 / 0<br>0% Used</span>
             </div>
             <div class="stat-card" id="bandwidthSentCard">
                 <i class="fas fa-upload icon"></i>
                 <h3>Bandwidth Sent</h3>
-                <div class="gauge" style="--percent: 0%;"></div>
+                <div class="spin"></div>
                 <span class="value" id="bandwidthSentValue">0</span><span class="unit">MB</span>
                 <span class="details" id="bandwidthSentDetails">GB: 0<br>TB: 0<br>Total: 0 MB</span>
             </div>
             <div class="stat-card" id="bandwidthRecvCard">
                 <i class="fas fa-download icon"></i>
                 <h3>Bandwidth Received</h3>
-                <div class="gauge" style="--percent: 0%;"></div>
+                <div class="spin"></div>
                 <span class="value" id="bandwidthRecvValue">0</span><span class="unit">MB</span>
                 <span class="details" id="bandwidthRecvDetails">GB: 0<br>TB: 0<br>Total: 0 MB</span>
             </div>
             <div class="stat-card">
                 <i class="fas fa-clock icon"></i>
                 <h3>Uptime</h3>
+                <div class="pulse"></div>
                 <span class="value" id="uptimeValue">0d 0h 0m 0s</span>
                 <span class="details">Since Last Boot</span>
             </div>
             <div class="stat-card" id="netCard">
                 <i class="fas fa-network-wired icon"></i>
                 <h3>Network Speed</h3>
+                <div class="wave"></div>
                 <span class="value" id="netSpeedValue">0</span><span class="unit">Gbps</span>
                 <span class="details" id="connectionsValue">Connections: 0</span>
             </div>
             <div class="stat-card">
                 <i class="fas fa-calendar-alt icon"></i>
                 <h3>Server Time</h3>
+                <div class="pulse"></div>
                 <span class="value" id="serverTimeValue">N/A</span>
                 <span class="details" id="timeDetails">TZ: Unknown<br>Boot: N/A</span>
             </div>
@@ -450,19 +521,15 @@
             document.getElementById('cpuValue').textContent = stats.cpu.toFixed(1);
             document.getElementById('cpuDetails').innerHTML = `${stats.cpu_count} CPUs @ ${stats.cpu_speed.toFixed(2)} GHz<br>Temp: ${stats.cpu_temp.toFixed(1)}°C<br>Load: ${stats.load_avg.toFixed(2)}`;
 
-            document.getElementById('ramCard').querySelector('.gauge').style.setProperty('--percent', `${stats.ram}%`);
             document.getElementById('ramValue').textContent = `${stats.ram_used_gb.toFixed(1)} / ${stats.ram_total_gb.toFixed(1)}`;
             document.getElementById('ramDetails').innerHTML = `MB: ${stats.ram_used_mb.toFixed(1)} / ${stats.ram_total_mb.toFixed(1)}<br>TB: ${stats.ram_used_tb.toFixed(3)} / ${stats.ram_total_tb.toFixed(3)}<br>${stats.ram.toFixed(1)}% Used`;
 
-            document.getElementById('diskCard').querySelector('.gauge').style.setProperty('--percent', `${stats.disk}%`);
             document.getElementById('diskValue').textContent = `${stats.disk_used_gb.toFixed(1)} / ${stats.disk_total_gb.toFixed(1)}`;
             document.getElementById('diskDetails').innerHTML = `MB: ${stats.disk_used_mb.toFixed(1)} / ${stats.disk_total_mb.toFixed(1)}<br>TB: ${stats.disk_used_tb.toFixed(3)} / ${stats.disk_total_tb.toFixed(3)}<br>${stats.disk.toFixed(1)}% Used`;
 
-            document.getElementById('bandwidthSentCard').querySelector('.gauge').style.setProperty('--percent', '50%');
             document.getElementById('bandwidthSentValue').textContent = dailySent.toFixed(1);
             document.getElementById('bandwidthSentDetails').innerHTML = `GB: ${(dailySent / 1024).toFixed(2)}<br>TB: ${(dailySent / 1024 / 1024).toFixed(3)}<br>Total: ${stats.bandwidth_sent_total_mb.toFixed(1)} MB`;
 
-            document.getElementById('bandwidthRecvCard').querySelector('.gauge').style.setProperty('--percent', '50%');
             document.getElementById('bandwidthRecvValue').textContent = dailyRecv.toFixed(1);
             document.getElementById('bandwidthRecvDetails').innerHTML = `GB: ${(dailyRecv / 1024).toFixed(2)}<br>TB: ${(dailyRecv / 1024 / 1024).toFixed(3)}<br>Total: ${stats.bandwidth_recv_total_mb.toFixed(1)} MB`;
 
