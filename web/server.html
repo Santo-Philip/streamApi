@@ -338,11 +338,17 @@
                 <span class="value" id="uptimeValue">0d 0h 0m 0s</span>
                 <span class="details">Since Last Boot</span>
             </div>
-            <div class="stat-card">
+            <div class="stat-card" id="netCard">
                 <i class="fas fa-network-wired icon"></i>
                 <h3>Network Speed</h3>
                 <span class="value" id="netSpeedValue">0</span><span class="unit">Gbps</span>
                 <span class="details" id="connectionsValue">Connections: 0</span>
+            </div>
+            <div class="stat-card">
+                <i class="fas fa-calendar-alt icon"></i>
+                <h3>Server Time</h3>
+                <span class="value" id="serverTimeValue">N/A</span>
+                <span class="details" id="timeDetails">TZ: Unknown<br>Boot: N/A</span>
             </div>
         </div>
 
@@ -421,7 +427,6 @@
             lastSent = stats.bandwidth_sent_total;
             lastRecv = stats.bandwidth_recv_total;
 
-            // Update Digital Stats
             document.getElementById('cpuCard').querySelector('.gauge').style.setProperty('--percent', `${stats.cpu}%`);
             document.getElementById('cpuValue').textContent = stats.cpu.toFixed(1);
             document.getElementById('cpuDetails').innerHTML = `${stats.cpu_count} CPUs @ ${stats.cpu_speed.toFixed(2)} GHz<br>Temp: ${stats.cpu_temp.toFixed(1)}°C<br>Load: ${stats.load_avg.toFixed(2)}`;
@@ -434,11 +439,11 @@
             document.getElementById('diskValue').textContent = `${stats.disk_used.toFixed(1)} / ${stats.disk_total.toFixed(1)}`;
             document.getElementById('diskDetails').textContent = `${stats.disk.toFixed(1)}% Used`;
 
-            document.getElementById('bandwidthSentCard').querySelector('.gauge').style.setProperty('--percent', '50%'); // Static for now
+            document.getElementById('bandwidthSentCard').querySelector('.gauge').style.setProperty('--percent', '50%');
             document.getElementById('bandwidthSentValue').textContent = dailySent.toFixed(1);
             document.getElementById('bandwidthSentDetails').innerHTML = `GB: ${(dailySent / 1024).toFixed(2)}<br>TB: ${(dailySent / 1024 / 1024).toFixed(3)}<br>Total: ${stats.bandwidth_sent_total.toFixed(1)} MB`;
 
-            document.getElementById('bandwidthRecvCard').querySelector('.gauge').style.setProperty('--percent', '50%'); // Static for now
+            document.getElementById('bandwidthRecvCard').querySelector('.gauge').style.setProperty('--percent', '50%');
             document.getElementById('bandwidthRecvValue').textContent = dailyRecv.toFixed(1);
             document.getElementById('bandwidthRecvDetails').innerHTML = `GB: ${(dailyRecv / 1024).toFixed(2)}<br>TB: ${(dailyRecv / 1024 / 1024).toFixed(3)}<br>Total: ${stats.bandwidth_recv_total.toFixed(1)} MB`;
 
@@ -452,7 +457,9 @@
             document.getElementById('netSpeedValue').textContent = stats.net_speed.toFixed(1);
             document.getElementById('connectionsValue').textContent = `Connections: ${stats.connections}`;
 
-            // Update Charts
+            document.getElementById('serverTimeValue').textContent = stats.server_time;
+            document.getElementById('timeDetails').innerHTML = `TZ: ${stats.timezone}<br>Boot: ${stats.boot_time}`;
+
             [cpuChart, ramChart, diskChart, bandwidthSentChart, bandwidthRecvChart].forEach((chart, index) => {
                 chart.data.labels.push(time);
                 chart.data.datasets[0].data.push(
