@@ -16,7 +16,7 @@
         }
 
         html {
-            scroll-behavior: smooth; /* Smooth scrolling for the entire page */
+            scroll-behavior: smooth;
         }
 
         body {
@@ -24,7 +24,7 @@
             color: #fff;
             min-height: 100vh;
             overflow-x: hidden;
-            overflow-y: auto; /* Ensure vertical scrolling is enabled */
+            overflow-y: auto;
         }
 
         .app-bar {
@@ -61,6 +61,15 @@
             font-size: 24px;
             cursor: pointer;
             margin-left: auto;
+        }
+
+        .date-picker {
+            margin-left: 20px;
+            padding: 5px;
+            background: rgba(40, 40, 40, 0.9);
+            border: 1px solid #555;
+            color: #fff;
+            border-radius: 5px;
         }
 
         .sidebar {
@@ -175,46 +184,132 @@
             background: conic-gradient(#ff3b30 var(--percent), #333 0);
             border-radius: 50px 50px 0 0;
             transform: rotate(180deg);
-            transition: background 0.5s ease-in-out; /* Smooth gauge fill */
+            transition: background 0.5s ease-in-out;
         }
 
-        /* Other Card Animations */
-        .stat-card .pulse {
+        /* RAM Ripple */
+        .stat-card .ripple {
             width: 60px;
             height: 60px;
             margin: 0 auto 10px;
+            position: relative;
             background: radial-gradient(circle, #007aff 10%, transparent 70%);
             border-radius: 50%;
-            animation: pulseEffect 1.5s infinite ease-in-out;
+            animation: rippleEffect 2s infinite ease-out;
         }
 
-        .stat-card .wave {
+        /* Disk Bar */
+        .stat-card .bar {
             width: 80px;
-            height: 20px;
+            height: 10px;
             margin: 0 auto 10px;
-            background: linear-gradient(90deg, #34c759, #007aff);
-            border-radius: 10px;
+            background: #34c759;
+            border-radius: 5px;
             position: relative;
             overflow: hidden;
         }
 
-        .stat-card .wave::before {
+        .stat-card .bar::before {
             content: '';
             position: absolute;
-            width: 200%;
+            width: 50%;
             height: 100%;
-            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.4), transparent);
-            animation: waveEffect 2s infinite linear;
+            background: rgba(255, 255, 255, 0.3);
+            animation: barEffect 1.5s infinite ease-in-out;
         }
 
-        .stat-card .spin {
+        /* Bandwidth Sent Arrow */
+        .stat-card .arrow {
+            width: 40px;
+            height: 40px;
+            margin: 0 auto 10px;
+            border: 4px solid #af52de;
+            border-radius: 50%;
+            position: relative;
+            animation: arrowEffect 1.8s infinite ease-in-out;
+        }
+
+        .stat-card .arrow::before {
+            content: '\2191';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 20px;
+            color: #af52de;
+        }
+
+        /* Bandwidth Received Arrow */
+        .stat-card .arrow-down {
+            width: 40px;
+            height: 40px;
+            margin: 0 auto 10px;
+            border: 4px solid #ff9500;
+            border-radius: 50%;
+            position: relative;
+            animation: arrowEffect 1.8s infinite ease-in-out;
+        }
+
+        .stat-card .arrow-down::before {
+            content: '\2193';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 20px;
+            color: #ff9500;
+        }
+
+        /* Uptime Clock */
+        .stat-card .clock {
             width: 50px;
             height: 50px;
             margin: 0 auto 10px;
-            border: 4px solid #af52de;
-            border-top: 4px solid #ff9500;
+            border: 3px solid #00c4cc;
             border-radius: 50%;
-            animation: spinEffect 1.2s infinite linear;
+            position: relative;
+        }
+
+        .stat-card .clock::before {
+            content: '';
+            position: absolute;
+            width: 2px;
+            height: 20px;
+            background: #00c4cc;
+            top: 10px;
+            left: 50%;
+            transform-origin: bottom;
+            animation: clockEffect 60s infinite linear;
+        }
+
+        /* Network Speed Signal */
+        .stat-card .signal {
+            width: 60px;
+            height: 40px;
+            margin: 0 auto 10px;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .stat-card .signal div {
+            width: 10px;
+            background: #ff2d55;
+            border-radius: 2px;
+            animation: signalEffect 1.5s infinite ease-in-out;
+        }
+
+        .stat-card .signal div:nth-child(1) { height: 10px; animation-delay: 0s; }
+        .stat-card .signal div:nth-child(2) { height: 20px; animation-delay: 0.2s; }
+        .stat-card .signal div:nth-child(3) { height: 30px; animation-delay: 0.4s; }
+
+        /* Server Time Pulse */
+        .stat-card .pulse {
+            width: 60px;
+            height: 60px;
+            margin: 0 auto 10px;
+            background: radial-gradient(circle, #5856d6 10%, transparent 70%);
+            border-radius: 50%;
+            animation: pulseEffect 1.5s infinite ease-in-out;
         }
 
         .stat-card .value {
@@ -247,41 +342,16 @@
         .stat-card:nth-child(7) { animation: fadeInUp 0.8s ease-out 0.4s; }
         .stat-card:nth-child(8) { animation: zoomIn 0.8s ease-out 0.4s; }
 
-        @keyframes slideInLeft {
-            from { transform: translateX(-100%); opacity: 0; }
-            to { transform: translateX(0); opacity: 1; }
-        }
-
-        @keyframes slideInRight {
-            from { transform: translateX(100%); opacity: 0; }
-            to { transform: translateX(0); opacity: 1; }
-        }
-
-        @keyframes fadeInUp {
-            from { transform: translateY(50px); opacity: 0; }
-            to { transform: translateY(0); opacity: 1; }
-        }
-
-        @keyframes zoomIn {
-            from { transform: scale(0.5); opacity: 0; }
-            to { transform: scale(1); opacity: 1; }
-        }
-
-        @keyframes pulseEffect {
-            0% { transform: scale(1); opacity: 0.8; }
-            50% { transform: scale(1.1); opacity: 1; }
-            100% { transform: scale(1); opacity: 0.8; }
-        }
-
-        @keyframes waveEffect {
-            0% { transform: translateX(-100%); }
-            100% { transform: translateX(100%); }
-        }
-
-        @keyframes spinEffect {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
+        @keyframes slideInLeft { from { transform: translateX(-100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+        @keyframes slideInRight { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+        @keyframes fadeInUp { from { transform: translateY(50px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+        @keyframes zoomIn { from { transform: scale(0.5); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+        @keyframes rippleEffect { 0% { box-shadow: 0 0 0 0 rgba(0, 122, 255, 0.5); } 100% { box-shadow: 0 0 0 20px transparent; } }
+        @keyframes barEffect { 0% { transform: translateX(-100%); } 50% { transform: translateX(100%); } 100% { transform: translateX(-100%); } }
+        @keyframes arrowEffect { 0% { transform: scale(1); } 50% { transform: scale(1.1); } 100% { transform: scale(1); } }
+        @keyframes clockEffect { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        @keyframes signalEffect { 0% { transform: scaleY(1); } 50% { transform: scaleY(1.2); } 100% { transform: scaleY(1); } }
+        @keyframes pulseEffect { 0% { transform: scale(1); opacity: 0.8; } 50% { transform: scale(1.1); opacity: 1; } 100% { transform: scale(1); opacity: 0.8; } }
 
         .grid-container {
             display: grid;
@@ -300,10 +370,7 @@
             animation: fadeIn 1s ease-in;
         }
 
-        @keyframes fadeIn {
-            from { opacity: 0; }
-            to { opacity: 1; }
-        }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 
         canvas {
             width: 100% !important;
@@ -318,49 +385,20 @@
         }
 
         @media (max-width: 768px) {
-            .grid-container {
-                grid-template-columns: 1fr;
-            }
-
-            .sidebar {
-                width: 200px;
-            }
-
-            .content.shifted {
-                margin-left: 200px;
-            }
-
-            .menu-btn {
-                display: block;
-            }
-
-            .app-bar h1 {
-                font-size: 20px;
-            }
-
-            .graph-container {
-                height: 300px;
-            }
+            .grid-container { grid-template-columns: 1fr; }
+            .sidebar { width: 200px; }
+            .content.shifted { margin-left: 200px; }
+            .menu-btn { display: block; }
+            .app-bar h1 { font-size: 20px; }
+            .graph-container { height: 300px; }
         }
 
         @media (max-width: 480px) {
-            .sidebar {
-                width: 100%;
-            }
-
-            .content.shifted {
-                margin-left: 0;
-            }
-
-            .graph-container {
-                height: 250px;
-            }
-
-            .overview {
-                grid-template-columns: 1fr;
-            }
-
-            .stat-card .gauge, .stat-card .pulse, .stat-card .wave, .stat-card .spin {
+            .sidebar { width: 100%; }
+            .content.shifted { margin-left: 0; }
+            .graph-container { height: 250px; }
+            .overview { grid-template-columns: 1fr; }
+            .stat-card .gauge, .stat-card .ripple, .stat-card .bar, .stat-card .arrow, .stat-card .clock, .stat-card .signal, .stat-card .pulse {
                 width: 80px;
             }
         }
@@ -370,6 +408,7 @@
     <div class="app-bar">
         <div class="logo"></div>
         <h1>Server Stats</h1>
+        <input type="date" id="datePicker" class="date-picker">
         <span class="menu-btn" onclick="toggleSidebar()">☰</span>
     </div>
 
@@ -394,42 +433,42 @@
             <div class="stat-card" id="ramCard">
                 <i class="fas fa-memory icon"></i>
                 <h3>RAM Usage</h3>
-                <div class="pulse"></div>
+                <div class="ripple"></div>
                 <span class="value" id="ramValue">0 / 0</span><span class="unit">GB</span>
                 <span class="details" id="ramDetails">MB: 0 / 0<br>TB: 0 / 0<br>0% Used</span>
             </div>
             <div class="stat-card" id="diskCard">
                 <i class="fas fa-hdd icon"></i>
                 <h3>Disk Usage</h3>
-                <div class="wave"></div>
+                <div class="bar"></div>
                 <span class="value" id="diskValue">0 / 0</span><span class="unit">GB</span>
                 <span class="details" id="diskDetails">MB: 0 / 0<br>TB: 0 / 0<br>0% Used</span>
             </div>
             <div class="stat-card" id="bandwidthSentCard">
                 <i class="fas fa-upload icon"></i>
                 <h3>Bandwidth Sent</h3>
-                <div class="spin"></div>
+                <div class="arrow"></div>
                 <span class="value" id="bandwidthSentValue">0</span><span class="unit">MB</span>
                 <span class="details" id="bandwidthSentDetails">GB: 0<br>TB: 0<br>Total: 0 MB</span>
             </div>
             <div class="stat-card" id="bandwidthRecvCard">
                 <i class="fas fa-download icon"></i>
                 <h3>Bandwidth Received</h3>
-                <div class="spin"></div>
+                <div class="arrow-down"></div>
                 <span class="value" id="bandwidthRecvValue">0</span><span class="unit">MB</span>
                 <span class="details" id="bandwidthRecvDetails">GB: 0<br>TB: 0<br>Total: 0 MB</span>
             </div>
             <div class="stat-card">
                 <i class="fas fa-clock icon"></i>
                 <h3>Uptime</h3>
-                <div class="pulse"></div>
+                <div class="clock"></div>
                 <span class="value" id="uptimeValue">0d 0h 0m 0s</span>
                 <span class="details">Since Last Boot</span>
             </div>
             <div class="stat-card" id="netCard">
                 <i class="fas fa-network-wired icon"></i>
                 <h3>Network Speed</h3>
-                <div class="wave"></div>
+                <div class="signal"><div></div><div></div><div></div></div>
                 <span class="value" id="netSpeedValue">0</span><span class="unit">Gbps</span>
                 <span class="details" id="connectionsValue">Connections: 0</span>
             </div>
@@ -481,38 +520,33 @@
             }
         };
 
-        const cpuChart = new Chart(document.getElementById('cpuChart'), {
-            ...chartOptions,
-            data: { labels: [], datasets: [{ label: 'CPU', data: [], borderColor: '#ff3b30', fill: false }] }
-        });
-        const ramChart = new Chart(document.getElementById('ramChart'), {
-            ...chartOptions,
-            data: { labels: [], datasets: [{ label: 'RAM', data: [], borderColor: '#007aff', fill: false }] }
-        });
-        const diskChart = new Chart(document.getElementById('diskChart'), {
-            ...chartOptions,
-            data: { labels: [], datasets: [{ label: 'Disk', data: [], borderColor: '#34c759', fill: false }] }
-        });
-        const bandwidthSentChart = new Chart(document.getElementById('bandwidthSentChart'), {
-            ...chartOptions,
-            data: { labels: [], datasets: [{ label: 'Sent', data: [], borderColor: '#af52de', fill: false }] }
-        });
-        const bandwidthRecvChart = new Chart(document.getElementById('bandwidthRecvChart'), {
-            ...chartOptions,
-            data: { labels: [], datasets: [{ label: 'Received', data: [], borderColor: '#ff9500', fill: false }] }
-        });
+        const charts = {
+            cpu: new Chart(document.getElementById('cpuChart'), { ...chartOptions, data: { labels: [], datasets: [{ label: 'CPU', data: [], borderColor: '#ff3b30', fill: false }] } }),
+            ram: new Chart(document.getElementById('ramChart'), { ...chartOptions, data: { labels: [], datasets: [{ label: 'RAM', data: [], borderColor: '#007aff', fill: false }] } }),
+            disk: new Chart(document.getElementById('diskChart'), { ...chartOptions, data: { labels: [], datasets: [{ label: 'Disk', data: [], borderColor: '#34c759', fill: false }] } }),
+            bandwidthSent: new Chart(document.getElementById('bandwidthSentChart'), { ...chartOptions, data: { labels: [], datasets: [{ label: 'Sent', data: [], borderColor: '#af52de', fill: false }] } }),
+            bandwidthRecv: new Chart(document.getElementById('bandwidthRecvChart'), { ...chartOptions, data: { labels: [], datasets: [{ label: 'Received', data: [], borderColor: '#ff9500', fill: false }] } })
+        };
 
         let lastSent = 0, lastRecv = 0;
-        let dailySent = 0, dailyRecv = 0;
+        let ws = new WebSocket('wss://media.mehub.in/server-stats');
 
-        const ws = new WebSocket('wss://media.mehub.in/server-stats');
-        ws.onmessage = (event) => {
-            const stats = JSON.parse(event.data);
+        function updateStats(stats) {
             const time = new Date().toLocaleTimeString();
+            const isLive = !stats.server_time.includes('N/A');
 
-            if (lastSent > 0) {
-                dailySent += (stats.bandwidth_sent_total_mb - lastSent);
-                dailyRecv += (stats.bandwidth_recv_total_mb - lastRecv);
+            if (isLive && lastSent > 0) {
+                const dailySent = stats.daily_sent_mb - lastSent;
+                const dailyRecv = stats.daily_recv_mb - lastRecv;
+                document.getElementById('bandwidthSentValue').textContent = dailySent.toFixed(1);
+                document.getElementById('bandwidthRecvValue').textContent = dailyRecv.toFixed(1);
+                document.getElementById('bandwidthSentDetails').innerHTML = `GB: ${(dailySent / 1024).toFixed(2)}<br>TB: ${(dailySent / 1024 / 1024).toFixed(3)}<br>Total: ${stats.bandwidth_sent_total_mb.toFixed(1)} MB`;
+                document.getElementById('bandwidthRecvDetails').innerHTML = `GB: ${(dailyRecv / 1024).toFixed(2)}<br>TB: ${(dailyRecv / 1024 / 1024).toFixed(3)}<br>Total: ${stats.bandwidth_recv_total_mb.toFixed(1)} MB`;
+            } else {
+                document.getElementById('bandwidthSentValue').textContent = stats.daily_sent_mb.toFixed(1);
+                document.getElementById('bandwidthRecvValue').textContent = stats.daily_recv_mb.toFixed(1);
+                document.getElementById('bandwidthSentDetails').innerHTML = `GB: ${(stats.daily_sent_mb / 1024).toFixed(2)}<br>TB: ${(stats.daily_sent_mb / 1024 / 1024).toFixed(3)}<br>Total: ${stats.bandwidth_sent_total_mb.toFixed(1)} MB`;
+                document.getElementById('bandwidthRecvDetails').innerHTML = `GB: ${(stats.daily_recv_mb / 1024).toFixed(2)}<br>TB: ${(stats.daily_recv_mb / 1024 / 1024).toFixed(3)}<br>Total: ${stats.bandwidth_recv_total_mb.toFixed(1)} MB`;
             }
             lastSent = stats.bandwidth_sent_total_mb;
             lastRecv = stats.bandwidth_recv_total_mb;
@@ -527,12 +561,6 @@
             document.getElementById('diskValue').textContent = `${stats.disk_used_gb.toFixed(1)} / ${stats.disk_total_gb.toFixed(1)}`;
             document.getElementById('diskDetails').innerHTML = `MB: ${stats.disk_used_mb.toFixed(1)} / ${stats.disk_total_mb.toFixed(1)}<br>TB: ${stats.disk_used_tb.toFixed(3)} / ${stats.disk_total_tb.toFixed(3)}<br>${stats.disk.toFixed(1)}% Used`;
 
-            document.getElementById('bandwidthSentValue').textContent = dailySent.toFixed(1);
-            document.getElementById('bandwidthSentDetails').innerHTML = `GB: ${(dailySent / 1024).toFixed(2)}<br>TB: ${(dailySent / 1024 / 1024).toFixed(3)}<br>Total: ${stats.bandwidth_sent_total_mb.toFixed(1)} MB`;
-
-            document.getElementById('bandwidthRecvValue').textContent = dailyRecv.toFixed(1);
-            document.getElementById('bandwidthRecvDetails').innerHTML = `GB: ${(dailyRecv / 1024).toFixed(2)}<br>TB: ${(dailyRecv / 1024 / 1024).toFixed(3)}<br>Total: ${stats.bandwidth_recv_total_mb.toFixed(1)} MB`;
-
             const uptime = stats.uptime;
             const days = Math.floor(uptime / 86400);
             const hours = Math.floor((uptime % 86400) / 3600);
@@ -546,23 +574,49 @@
             document.getElementById('serverTimeValue').textContent = stats.server_time;
             document.getElementById('timeDetails').innerHTML = `TZ: ${stats.timezone}<br>Boot: ${stats.boot_time}`;
 
-            [cpuChart, ramChart, diskChart, bandwidthSentChart, bandwidthRecvChart].forEach((chart, index) => {
-                chart.data.labels.push(time);
-                chart.data.datasets[0].data.push(
-                    index === 0 ? stats.cpu :
-                    index === 1 ? stats.ram :
-                    index === 2 ? stats.disk :
-                    index === 3 ? stats.bandwidth_sent_total_mb :
-                    stats.bandwidth_recv_total_mb
-                );
-                if (chart.data.labels.length > 20) {
-                    chart.data.labels.shift();
-                    chart.data.datasets[0].data.shift();
-                }
-                chart.update();
-            });
+            if (isLive) {
+                Object.values(charts).forEach((chart, index) => {
+                    chart.data.labels.push(time);
+                    chart.data.datasets[0].data.push(
+                        index === 0 ? stats.cpu :
+                        index === 1 ? stats.ram :
+                        index === 2 ? stats.disk :
+                        index === 3 ? stats.bandwidth_sent_total_mb :
+                        stats.bandwidth_recv_total_mb
+                    );
+                    if (chart.data.labels.length > 20) {
+                        chart.data.labels.shift();
+                        chart.data.datasets[0].data.shift();
+                    }
+                    chart.update();
+                });
+            } else {
+                Object.values(charts).forEach(chart => {
+                    chart.data.labels = [stats.server_time];
+                    chart.data.datasets[0].data = [chart === charts.cpu ? stats.cpu : chart === charts.ram ? stats.ram : chart === charts.disk ? stats.disk : chart === charts.bandwidthSent ? stats.daily_sent_mb : stats.daily_recv_mb];
+                    chart.update();
+                });
+            }
+        }
+
+        ws.onmessage = (event) => {
+            const stats = JSON.parse(event.data);
+            updateStats(stats);
         };
+
         ws.onerror = (error) => console.error('WebSocket error:', error);
+
+        document.getElementById('datePicker').addEventListener('change', async (e) => {
+            const selectedDate = e.target.value;
+            if (selectedDate) {
+                ws.close();
+                const response = await fetch(`https://media.mehub.in/server-stats?date=${selectedDate}`, { method: 'GET' });
+                const stats = await response.json();
+                if (stats) updateStats(stats);
+                ws = new WebSocket('wss://media.mehub.in/server-stats');
+                ws.onmessage = (event) => updateStats(JSON.parse(event.data));
+            }
+        });
 
         function toggleSidebar() {
             const sidebar = document.getElementById('sidebar');
