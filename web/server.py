@@ -10,9 +10,11 @@ async def get_server_stats():
     # CPU
     cpu_percent = psutil.cpu_percent(interval=1)
     cpu_count = psutil.cpu_count(logical=True)
-    cpu_freq = psutil.cpu_freq()
-    cpu_speed = cpu_freq.current if cpu_freq else 0  # MHz
+    cpu_freq = psutil.cpu_freq() or psutil._common.scpufreq(0, 0, 0)  # Fallback
+    cpu_speed = cpu_freq.current / 1000 if cpu_freq.current else 0  # GHz
     cpu_model = platform.processor() or "Unknown"
+    cpu_temp = psutil.sensors_temperatures().get('coretemp', [None])[0].current if psutil.sensors_temperatures().get('coretemp') else 0
+    load_avg = os.getloadavg() if hasattr(os, 'getloadavg') else (0, 0, 0)  # 1, 5, 15 min
 
     # RAM
     ram = psutil.virtual_memory()
@@ -28,17 +30,21 @@ async def get_server_stats():
     net = psutil.net_io_counters()
     bandwidth_sent_total = net.bytes_sent / 1024 / 1024  # MB
     bandwidth_recv_total = net.bytes_recv / 1024 / 1024  # MB
-    # Today's bandwidth (reset daily, requires tracking; here we show total for simplicity)
-    # For daily, you'd need persistent storage; this is cumulative for now
+    net_speed = psutil.net_if_stats().get('eth0', psutil._common.snicstats(True, 0, 0, 0)).speed / 1000  # Gbps
 
     # Uptime
     uptime_seconds = time.time() - psutil.boot_time()
 
+    # Connections
+    connections = len(psutil.net_connections())
+
     return {
         'cpu': cpu_percent,
         'cpu_count': cpu_count,
-        'cpu_speed': cpu_speed / 1000 if cpu_speed else 0,  # GHz
+        'cpu_speed': cpu_speed,
         'cpu_model': cpu_model,
+        'cpu_temp': cpu_temp,
+        'load_avg': load_avg[0],  # 1-min average
         'ram': ram.percent,
         'ram_used': ram_used,
         'ram_total': ram_total,
@@ -47,7 +53,9 @@ async def get_server_stats():
         'disk_total': disk_total,
         'bandwidth_sent_total': bandwidth_sent_total,
         'bandwidth_recv_total': bandwidth_recv_total,
-        'uptime': uptime_seconds
+        'net_speed': net_speed,
+        'uptime': uptime_seconds,
+        'connections': connections
     }
 
 async def websocket_handler(request):

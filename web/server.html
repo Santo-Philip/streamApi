@@ -4,8 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Server Stats - Media MeHub</title>
-    <link rel="shortcut icon" type="image/x-icon" href="https://mehub.in/logo.ico" />
+    <link rel="icon" href="https://mehub.in/logo.ico" type="image/x-icon">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <style>
         * {
             margin: 0;
@@ -15,7 +16,7 @@
         }
 
         body {
-            background: #000;
+            background: linear-gradient(135deg, #1a1a1a, #000);
             color: #fff;
             min-height: 100vh;
             overflow-x: hidden;
@@ -38,6 +39,7 @@
             align-items: center;
             padding: 0 20px;
             z-index: 1000;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
         }
 
         .logo {
@@ -46,6 +48,7 @@
             background: url('https://mehub.in/logo.ico') no-repeat center;
             background-size: cover;
             margin-right: 15px;
+            border-radius: 50%;
         }
 
         .app-bar h1 {
@@ -99,10 +102,10 @@
 
         .content {
             margin-left: 0;
-            padding: 80px 20px 20px;
-            transition: margin-left 0.3s ease;
+            padding: 60px 20px 20px;
             max-width: 1200px;
-            margin: 80px auto 20px;
+            margin: 60px auto 20px;
+            transition: margin-left 0.3s ease;
         }
 
         .content.shifted {
@@ -117,12 +120,38 @@
         }
 
         .stat-card {
-            background: rgba(40, 40, 40, 0.8);
-            border-radius: 12px;
+            background: rgba(40, 40, 40, 0.9);
+            border-radius: 16px;
             padding: 20px;
             text-align: center;
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5), inset 0 0 10px rgba(255, 255, 255, 0.1);
+            position: relative;
+            overflow: hidden;
             animation: slideUp 0.5s ease;
+        }
+
+        .stat-card::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle, rgba(255, 255, 255, 0.1) 10%, transparent 60%);
+            transform: rotate(30deg);
+            pointer-events: none;
+        }
+
+        .stat-card .icon {
+            font-size: 32px;
+            margin-bottom: 10px;
+            color: #fff;
+            opacity: 0.8;
+            transition: transform 0.3s ease;
+        }
+
+        .stat-card:hover .icon {
+            transform: scale(1.1);
         }
 
         .stat-card h3 {
@@ -131,12 +160,29 @@
             margin-bottom: 10px;
         }
 
+        .stat-card .gauge {
+            width: 100px;
+            height: 50px;
+            margin: 0 auto 10px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .stat-card .gauge::before {
+            content: '';
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            background: conic-gradient(#007aff var(--percent), #333 0);
+            border-radius: 50px 50px 0 0;
+            transform: rotate(180deg);
+        }
+
         .stat-card .value {
             font-size: 24px;
             font-weight: 600;
             color: #fff;
             display: block;
-            margin-bottom: 5px;
         }
 
         .stat-card .unit {
@@ -148,6 +194,7 @@
             font-size: 12px;
             color: #bbb;
             margin-top: 5px;
+            line-height: 1.4;
         }
 
         @keyframes slideUp {
@@ -225,6 +272,10 @@
             .overview {
                 grid-template-columns: 1fr;
             }
+
+            .stat-card .gauge {
+                width: 80px;
+            }
         }
     </style>
 </head>
@@ -246,35 +297,52 @@
 
     <div class="content" id="content">
         <div class="overview">
-            <div class="stat-card">
+            <div class="stat-card" id="cpuCard">
+                <i class="fas fa-microchip icon"></i>
                 <h3>CPU Usage</h3>
+                <div class="gauge" style="--percent: 0%;"></div>
                 <span class="value" id="cpuValue">0</span><span class="unit">%</span>
-                <span class="details" id="cpuDetails">0 CPUs @ 0 GHz</span>
+                <span class="details" id="cpuDetails">0 CPUs @ 0 GHz<br>Temp: 0°C<br>Load: 0</span>
             </div>
-            <div class="stat-card">
+            <div class="stat-card" id="ramCard">
+                <i class="fas fa-memory icon"></i>
                 <h3>RAM Usage</h3>
+                <div class="gauge" style="--percent: 0%;"></div>
                 <span class="value" id="ramValue">0 / 0</span><span class="unit">GB</span>
                 <span class="details" id="ramDetails">0% Used</span>
             </div>
-            <div class="stat-card">
+            <div class="stat-card" id="diskCard">
+                <i class="fas fa-hdd icon"></i>
                 <h3>Disk Usage</h3>
+                <div class="gauge" style="--percent: 0%;"></div>
                 <span class="value" id="diskValue">0 / 0</span><span class="unit">GB</span>
                 <span class="details" id="diskDetails">0% Used</span>
             </div>
-            <div class="stat-card">
+            <div class="stat-card" id="bandwidthSentCard">
+                <i class="fas fa-upload icon"></i>
                 <h3>Bandwidth Sent</h3>
+                <div class="gauge" style="--percent: 0%;"></div>
                 <span class="value" id="bandwidthSentValue">0</span><span class="unit">MB</span>
-                <span class="details" id="bandwidthSentDetails">Total: 0 MB</span>
+                <span class="details" id="bandwidthSentDetails">GB: 0<br>TB: 0<br>Total: 0 MB</span>
             </div>
-            <div class="stat-card">
+            <div class="stat-card" id="bandwidthRecvCard">
+                <i class="fas fa-download icon"></i>
                 <h3>Bandwidth Received</h3>
+                <div class="gauge" style="--percent: 0%;"></div>
                 <span class="value" id="bandwidthRecvValue">0</span><span class="unit">MB</span>
-                <span class="details" id="bandwidthRecvDetails">Total: 0 MB</span>
+                <span class="details" id="bandwidthRecvDetails">GB: 0<br>TB: 0<br>Total: 0 MB</span>
             </div>
             <div class="stat-card">
+                <i class="fas fa-clock icon"></i>
                 <h3>Uptime</h3>
                 <span class="value" id="uptimeValue">0d 0h 0m 0s</span>
                 <span class="details">Since Last Boot</span>
+            </div>
+            <div class="stat-card">
+                <i class="fas fa-network-wired icon"></i>
+                <h3>Network Speed</h3>
+                <span class="value" id="netSpeedValue">0</span><span class="unit">Gbps</span>
+                <span class="details" id="connectionsValue">Connections: 0</span>
             </div>
         </div>
 
@@ -338,7 +406,6 @@
             data: { labels: [], datasets: [{ label: 'Received', data: [], borderColor: '#ff9500', fill: false }] }
         });
 
-        // Bandwidth tracking (simplified, total only)
         let lastSent = 0, lastRecv = 0;
         let dailySent = 0, dailyRecv = 0;
 
@@ -347,7 +414,6 @@
             const stats = JSON.parse(event.data);
             const time = new Date().toLocaleTimeString();
 
-            // Calculate daily bandwidth (difference from last reading)
             if (lastSent > 0) {
                 dailySent += (stats.bandwidth_sent_total - lastSent);
                 dailyRecv += (stats.bandwidth_recv_total - lastRecv);
@@ -356,24 +422,35 @@
             lastRecv = stats.bandwidth_recv_total;
 
             // Update Digital Stats
+            document.getElementById('cpuCard').querySelector('.gauge').style.setProperty('--percent', `${stats.cpu}%`);
             document.getElementById('cpuValue').textContent = stats.cpu.toFixed(1);
-            document.getElementById('cpuDetails').textContent = `${stats.cpu_count} CPUs @ ${stats.cpu_speed.toFixed(2)} GHz (${stats.cpu_model})`;
+            document.getElementById('cpuDetails').innerHTML = `${stats.cpu_count} CPUs @ ${stats.cpu_speed.toFixed(2)} GHz<br>Temp: ${stats.cpu_temp.toFixed(1)}°C<br>Load: ${stats.load_avg.toFixed(2)}`;
+
+            document.getElementById('ramCard').querySelector('.gauge').style.setProperty('--percent', `${stats.ram}%`);
             document.getElementById('ramValue').textContent = `${stats.ram_used.toFixed(1)} / ${stats.ram_total.toFixed(1)}`;
             document.getElementById('ramDetails').textContent = `${stats.ram.toFixed(1)}% Used`;
+
+            document.getElementById('diskCard').querySelector('.gauge').style.setProperty('--percent', `${stats.disk}%`);
             document.getElementById('diskValue').textContent = `${stats.disk_used.toFixed(1)} / ${stats.disk_total.toFixed(1)}`;
             document.getElementById('diskDetails').textContent = `${stats.disk.toFixed(1)}% Used`;
-            document.getElementById('bandwidthSentValue').textContent = dailySent.toFixed(1);
-            document.getElementById('bandwidthSentDetails').textContent = `Total: ${stats.bandwidth_sent_total.toFixed(1)} MB`;
-            document.getElementById('bandwidthRecvValue').textContent = dailyRecv.toFixed(1);
-            document.getElementById('bandwidthRecvDetails').textContent = `Total: ${stats.bandwidth_recv_total.toFixed(1)} MB`;
 
-            // Uptime in days, hours, minutes, seconds
+            document.getElementById('bandwidthSentCard').querySelector('.gauge').style.setProperty('--percent', '50%'); // Static for now
+            document.getElementById('bandwidthSentValue').textContent = dailySent.toFixed(1);
+            document.getElementById('bandwidthSentDetails').innerHTML = `GB: ${(dailySent / 1024).toFixed(2)}<br>TB: ${(dailySent / 1024 / 1024).toFixed(3)}<br>Total: ${stats.bandwidth_sent_total.toFixed(1)} MB`;
+
+            document.getElementById('bandwidthRecvCard').querySelector('.gauge').style.setProperty('--percent', '50%'); // Static for now
+            document.getElementById('bandwidthRecvValue').textContent = dailyRecv.toFixed(1);
+            document.getElementById('bandwidthRecvDetails').innerHTML = `GB: ${(dailyRecv / 1024).toFixed(2)}<br>TB: ${(dailyRecv / 1024 / 1024).toFixed(3)}<br>Total: ${stats.bandwidth_recv_total.toFixed(1)} MB`;
+
             const uptime = stats.uptime;
             const days = Math.floor(uptime / 86400);
             const hours = Math.floor((uptime % 86400) / 3600);
             const minutes = Math.floor((uptime % 3600) / 60);
             const seconds = Math.floor(uptime % 60);
             document.getElementById('uptimeValue').textContent = `${days}d ${hours}h ${minutes}m ${seconds}s`;
+
+            document.getElementById('netSpeedValue').textContent = stats.net_speed.toFixed(1);
+            document.getElementById('connectionsValue').textContent = `Connections: ${stats.connections}`;
 
             // Update Charts
             [cpuChart, ramChart, diskChart, bandwidthSentChart, bandwidthRecvChart].forEach((chart, index) => {
