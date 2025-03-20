@@ -1,7 +1,7 @@
 from aiohttp import web
 import psutil
 import asyncio
-
+import os
 
 async def get_server_stats():
     cpu = psutil.cpu_percent(interval=1)
@@ -31,6 +31,7 @@ async def websocket_handler(request):
     return ws
 
 async def index_handler(request):
-    # Serve the HTML page with the graph
-    with open('server.html', 'r') as f:
+    # Use os.path.join to construct the file path
+    file_path = os.path.join(os.path.dirname(__file__), 'server.html')
+    with open(file_path, 'r') as f:
         return web.Response(text=f.read(), content_type='text/html')
