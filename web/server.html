@@ -2,54 +2,284 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Server Stats</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
-        canvas { max-width: 600px; margin: 20px auto; }
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", sans-serif;
+        }
+
+        body {
+            background: #000;
+            color: #fff;
+            min-height: 100vh;
+            overflow-x: hidden;
+            animation: fadeIn 1s ease-in;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        /* App Bar */
+        .app-bar {
+            position: fixed;
+            top: 0;
+            width: 100%;
+            height: 60px;
+            background: rgba(20, 20, 20, 0.9);
+            backdrop-filter: blur(10px);
+            display: flex;
+            align-items: center;
+            padding: 0 20px;
+            z-index: 1000;
+        }
+
+        .logo {
+            width: 40px;
+            height: 40px;
+            background: url('https://via.placeholder.com/40?text=Logo') no-repeat center;
+            background-size: cover;
+            margin-right: 15px;
+        }
+
+        .app-bar h1 {
+            font-size: 24px;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+        }
+
+        .menu-btn {
+            display: none;
+            font-size: 24px;
+            cursor: pointer;
+            margin-left: auto;
+        }
+
+        /* Sidebar */
+        .sidebar {
+            position: fixed;
+            top: 60px;
+            left: 0;
+            width: 250px;
+            height: calc(100% - 60px);
+            background: rgba(30, 30, 30, 0.95);
+            transform: translateX(-100%);
+            transition: transform 0.3s ease;
+        }
+
+        .sidebar.active {
+            transform: translateX(0);
+        }
+
+        .sidebar ul {
+            list-style: none;
+            padding: 20px;
+        }
+
+        .sidebar li {
+            margin: 20px 0;
+        }
+
+        .sidebar a {
+            color: #fff;
+            text-decoration: none;
+            font-size: 18px;
+            opacity: 0.7;
+            transition: opacity 0.2s;
+        }
+
+        .sidebar a:hover {
+            opacity: 1;
+        }
+
+        /* Main Content */
+        .content {
+            margin-left: 0;
+            padding: 80px 20px 20px;
+            transition: margin-left 0.3s ease;
+        }
+
+        .content.shifted {
+            margin-left: 250px;
+        }
+
+        .graph-container {
+            background: rgba(40, 40, 40, 0.8);
+            border-radius: 12px;
+            padding: 20px;
+            margin: 20px 0;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+            animation: slideUp 0.5s ease;
+        }
+
+        @keyframes slideUp {
+            from { transform: translateY(20px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+
+        canvas {
+            max-width: 100%;
+            height: auto;
+        }
+
+        h2 {
+            font-size: 20px;
+            margin-bottom: 15px;
+            color: #f5f5f5;
+            letter-spacing: 0.3px;
+        }
+
+        /* Responsive Design */
+        @media (max-width: 768px) {
+            .sidebar {
+                width: 200px;
+            }
+
+            .content.shifted {
+                margin-left: 200px;
+            }
+
+            .menu-btn {
+                display: block;
+            }
+
+            .app-bar h1 {
+                font-size: 20px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .sidebar {
+                width: 100%;
+            }
+
+            .content.shifted {
+                margin-left: 0;
+            }
+
+            .graph-container {
+                padding: 10px;
+            }
+        }
     </style>
 </head>
 <body>
-    <h1>Server Statistics</h1>
-    <canvas id="statsChart"></canvas>
+    <!-- App Bar -->
+    <div class="app-bar">
+        <div class="logo"></div>
+        <h1>Server Stats</h1>
+        <span class="menu-btn" onclick="toggleSidebar()">☰</span>
+    </div>
+
+    <!-- Sidebar -->
+    <div class="sidebar" id="sidebar">
+        <ul>
+            <li><a href="#">Dashboard</a></li>
+            <li><a href="#">Videos</a></li>
+            <li><a href="#">Settings</a></li>
+            <li><a href="#">Logout</a></li>
+        </ul>
+    </div>
+
+    <!-- Main Content -->
+    <div class="content" id="content">
+        <div class="graph-container">
+            <h2>CPU Usage (%)</h2>
+            <canvas id="cpuChart"></canvas>
+        </div>
+        <div class="graph-container">
+            <h2>RAM Usage (%)</h2>
+            <canvas id="ramChart"></canvas>
+        </div>
+        <div class="graph-container">
+            <h2>Disk Usage (%)</h2>
+            <canvas id="diskChart"></canvas>
+        </div>
+        <div class="graph-container">
+            <h2>Bandwidth Sent (MB)</h2>
+            <canvas id="bandwidthSentChart"></canvas>
+        </div>
+        <div class="graph-container">
+            <h2>Bandwidth Received (MB)</h2>
+            <canvas id="bandwidthRecvChart"></canvas>
+        </div>
+    </div>
+
     <script>
-        const ctx = document.getElementById('statsChart').getContext('2d');
-        const chart = new Chart(ctx, {
+        // Chart Configuration
+        const chartOptions = {
             type: 'line',
-            data: {
-                labels: [],
-                datasets: [
-                    { label: 'CPU (%)', data: [], borderColor: 'red', fill: false },
-                    { label: 'RAM (%)', data: [], borderColor: 'blue', fill: false },
-                    { label: 'Disk (%)', data: [], borderColor: 'green', fill: false },
-                    { label: 'Bandwidth Sent (MB)', data: [], borderColor: 'purple', fill: false },
-                    { label: 'Bandwidth Recv (MB)', data: [], borderColor: 'orange', fill: false }
-                ]
-            },
             options: {
-                scales: { x: { title: { display: true, text: 'Time' } }, y: { beginAtZero: true } }
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    x: { title: { display: true, text: 'Time', color: '#fff' }, ticks: { color: '#ccc' } },
+                    y: { beginAtZero: true, title: { display: true, color: '#fff' }, ticks: { color: '#ccc' } }
+                },
+                plugins: { legend: { labels: { color: '#fff' } } },
+                animation: { duration: 500, easing: 'easeInOutQuad' }
             }
+        };
+
+        const cpuChart = new Chart(document.getElementById('cpuChart'), {
+            ...chartOptions,
+            data: { labels: [], datasets: [{ label: 'CPU', data: [], borderColor: '#ff3b30', fill: false }] }
+        });
+        const ramChart = new Chart(document.getElementById('ramChart'), {
+            ...chartOptions,
+            data: { labels: [], datasets: [{ label: 'RAM', data: [], borderColor: '#007aff', fill: false }] }
+        });
+        const diskChart = new Chart(document.getElementById('diskChart'), {
+            ...chartOptions,
+            data: { labels: [], datasets: [{ label: 'Disk', data: [], borderColor: '#34c759', fill: false }] }
+        });
+        const bandwidthSentChart = new Chart(document.getElementById('bandwidthSentChart'), {
+            ...chartOptions,
+            data: { labels: [], datasets: [{ label: 'Sent', data: [], borderColor: '#af52de', fill: false }] }
+        });
+        const bandwidthRecvChart = new Chart(document.getElementById('bandwidthRecvChart'), {
+            ...chartOptions,
+            data: { labels: [], datasets: [{ label: 'Received', data: [], borderColor: '#ff9500', fill: false }] }
         });
 
-        const ws = new WebSocket('wss://media.mehub.in/server-stats');
+        // WebSocket Connection
+        const ws = new WebSocket('wss://yourdomain.com/server-stats');
         ws.onmessage = (event) => {
             const stats = JSON.parse(event.data);
             const time = new Date().toLocaleTimeString();
 
-            // Update chart
-            chart.data.labels.push(time);
-            chart.data.datasets[0].data.push(stats.cpu);
-            chart.data.datasets[1].data.push(stats.ram);
-            chart.data.datasets[2].data.push(stats.disk);
-            chart.data.datasets[3].data.push(stats.bandwidth_sent);
-            chart.data.datasets[4].data.push(stats.bandwidth_recv);
-
-            // Limit to 20 data points
-            if (chart.data.labels.length > 20) {
-                chart.data.labels.shift();
-                chart.data.datasets.forEach(dataset => dataset.data.shift());
-            }
-            chart.update();
+            // Update all charts
+            [cpuChart, ramChart, diskChart, bandwidthSentChart, bandwidthRecvChart].forEach((chart, index) => {
+                chart.data.labels.push(time);
+                chart.data.datasets[0].data.push(
+                    index === 0 ? stats.cpu :
+                    index === 1 ? stats.ram :
+                    index === 2 ? stats.disk :
+                    index === 3 ? stats.bandwidth_sent :
+                    stats.bandwidth_recv
+                );
+                if (chart.data.labels.length > 20) {
+                    chart.data.labels.shift();
+                    chart.data.datasets[0].data.shift();
+                }
+                chart.update();
+            });
         };
+        ws.onerror = (error) => console.error('WebSocket error:', error);
+
+        // Sidebar Toggle
+        function toggleSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            const content = document.getElementById('content');
+            sidebar.classList.toggle('active');
+            content.classList.toggle('shifted');
+        }
     </script>
 </body>
 </html>
