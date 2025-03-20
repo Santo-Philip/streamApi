@@ -1,11 +1,9 @@
-import aiohttp
 from aiohttp import web
 import psutil
 import asyncio
-import json
+
 
 async def get_server_stats():
-    # Collect server stats
     cpu = psutil.cpu_percent(interval=1)
     ram = psutil.virtual_memory().percent
     disk = psutil.disk_usage('/').percent
