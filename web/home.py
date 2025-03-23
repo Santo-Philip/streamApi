@@ -1,4 +1,5 @@
 import os
+import re
 import traceback
 import uuid
 from aiohttp import web
@@ -92,11 +93,6 @@ async def serve_hls(request):
         return web.Response(text=f"Error serving HLS file: {str(e)}", status=500)
 
 
-import os
-import traceback
-import re
-from aiohttp import web
-
 
 async def serve_video_player(request):
     try:
@@ -121,7 +117,7 @@ async def serve_video_player(request):
         filename = video_details.get('filename', video_id)
 
         # Define the path to the HTML file
-        html_file_path = os.path.join(os.path.dirname(__file__), 'video_player.html')
+        html_file_path = os.path.join(os.path.dirname(__file__), 'player.html')
 
         # Verify file exists
         if not os.path.exists(html_file_path):
