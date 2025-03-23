@@ -134,6 +134,8 @@ async def serve_video_player(request):
                 }}
                 .video-container {{
                     position: relative;
+                    width: 100%;
+                    height: 100vh;
                 }}
                 .video-js {{ 
                     width: 100%; 
@@ -241,6 +243,79 @@ async def serve_video_player(request):
                 .vjs-control-bar:not(.vjs-hidden) ~ .video-title {{
                     opacity: 1;
                 }}
+                .settings-button {{
+                    position: absolute;
+                    top: 10px;
+                    right: 10px;
+                    color: #fff;
+                    background: rgba(0,0,0,0.7);
+                    padding: 5px;
+                    border-radius: 3px;
+                    cursor: pointer;
+                    z-index: 1000;
+                    opacity: 0;
+                    transition: opacity 0.3s ease;
+                }}
+                .vjs-control-bar:not(.vjs-hidden) ~ .settings-button {{
+                    opacity: 1;
+                }}
+                .settings-overlay {{
+                    display: none;
+                    position: absolute;
+                    top: 0;
+                    left: 0;
+                    width: 100%;
+                    height: 100%;
+                    background: rgba(0, 0, 0, 0.9);
+                    z-index: 2000;
+                    color: #fff;
+                    font-family: Arial, sans-serif;
+                    overflow-y: auto;
+                }}
+                .settings-overlay.show {{
+                    display: block;
+                }}
+                .settings-content {{
+                    padding: 20px;
+                    max-width: 400px;
+                    margin: 50px auto;
+                    background: rgba(255, 255, 255, 0.1);
+                    border-radius: 5px;
+                }}
+                .settings-item {{
+                    margin-bottom: 15px;
+                }}
+                .settings-item label {{
+                    display: block;
+                    margin-bottom: 5px;
+                }}
+                .settings-item select {{
+                    width: 100%;
+                    padding: 5px;
+                    background: #333;
+                    color: #fff;
+                    border: none;
+                    border-radius: 3px;
+                }}
+                .close-button {{
+                    position: absolute;
+                    top: 10px;
+                    right: 10px;
+                    color: #fff;
+                    font-size: 24px;
+                    cursor: pointer;
+                }}
+                .overlay-filename {{
+                    position: absolute;
+                    top: 40px;
+                    left: 10px;
+                    color: #fff;
+                    background: rgba(0,0,0,0.7);
+                    padding: 5px 10px;
+                    border-radius: 3px;
+                    font-family: Arial, sans-serif;
+                    z-index: 1000;
+                }}
                 .seek-info {{
                     position: absolute;
                     top: 50%;
@@ -261,17 +336,6 @@ async def serve_video_player(request):
                     opacity: 1;
                     transform: translate(-50%, -60%);
                 }}
-                .overlay-filename {{
-                    position: absolute;
-                    top: 40px;
-                    left: 10px;
-                    color: #fff;
-                    background: rgba(0,0,0,0.7);
-                    padding: 5px 10px;
-                    border-radius: 3px;
-                    font-family: Arial, sans-serif;
-                    z-index: 1000;
-                }}
             </style>
         </head>
         <body>
@@ -283,7 +347,28 @@ async def serve_video_player(request):
                 <img src="{logo_url}" class="logo" alt="Logo" onerror="this.style.display='none'">
                 <div class="video-title">{video_title}</div>
                 <div class="overlay-filename">{filename}</div>
+                <div class="settings-button" onclick="toggleSettings()">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="#fff">
+                        <path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.06-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.43-.48-.43h-3.84c-.24 0-.43.19-.47.43l-.36 2.54c-.59.24-1.13.56-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.04.3-.06.62-.06.94s.02.64.06.94l-2.03 1.58c-.18.14-.23.41-.12-.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.43.48.43h3.84c.24 0 .44-.19.47-.43l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/>
+                    </svg>
+                </div>
                 <div class="seek-info" id="seek-info"></div>
+                <div class="settings-overlay" id="settings-overlay">
+                    <span class="close-button" onclick="toggleSettings()">×</span>
+                    <div class="settings-content">
+                        <h2>Settings</h2>
+                        <div class="settings-item">
+                            <label>Audio Track</label>
+                            <select id="audio-tracks"></select>
+                        </div>
+                        <div class="settings-item">
+                            <label>Subtitles/Captions</label>
+                            <select id="subtitle-tracks">
+                                <option value="off">Off</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
             </div>
             <script>
                 const player = videojs('video-player', {{
@@ -306,9 +391,7 @@ async def serve_video_player(request):
                         remainingTimeDisplay: false,
                         progressControl: {{
                             seekBar: true
-                        }},
-                        audioTrackButton: true,
-                        textTrackButton: true
+                        }}
                     }}
                 }});
 
@@ -323,43 +406,60 @@ async def serve_video_player(request):
                         }});
                     }}
 
+                    // Audio Tracks
+                    const audioTracks = player.audioTracks();
+                    const audioSelect = document.getElementById('audio-tracks');
+                    if (audioTracks && audioTracks.length > 0) {{
+                        for (let i = 0; i < audioTracks.length; i++) {{
+                            const track = audioTracks[i];
+                            const option = document.createElement('option');
+                            option.value = track.id;
+                            if (track.enabled) option.selected = true;
+                            audioSelect.appendChild(option);
+                        }}
+                        audioSelect.onchange = function() {{
+                            const tracks = player.audioTracks();
+                            for (let i = 0; i < tracks.length; i++) {{
+                                tracks[i].enabled = tracks[i].id === this.value;
+                            }}
+                        }};
+                        audioTracks.on('change', function() {{
+                            const tracks = player.audioTracks();
+                            const activeTrack = Array.from(tracks).find(t => t.enabled);
+                            audioSelect.value = activeTrack ? activeTrack.id : '';
+                            console.log('Switched to audio track:', activeTrack ? activeTrack.label : 'None');
+                        }});
+                    }}
+
+                    // Subtitles/Captions
+                    const textTracks = player.textTracks();
+                    const subtitleSelect = document.getElementById('subtitle-tracks');
+                    if (textTracks && textTracks.length > 0) {{
+                        for (let i = 0; i < textTracks.length; i++) {{
+                            const track = textTracks[i];
+                            if (track.kind === 'subtitles' || track.kind === 'captions') {{
+                                const option = document.createElement('option');
+                                option.value = track.label;
+                                subtitleSelect.appendChild(option);
+                            }}
+                        }}
+                        subtitleSelect.onchange = function() {{
+                            const tracks = player.textTracks();
+                            for (let i = 0; i < tracks.length; i++) {{
+                                tracks[i].mode = (this.value === 'off' || tracks[i].label !== this.value) ? 'disabled' : 'showing';
+                            }}
+                        }};
+                        textTracks.on('change', function() {{
+                            const tracks = player.textTracks();
+                            const activeTrack = Array.from(tracks).find(t => t.mode === 'showing');
+                            subtitleSelect.value = activeTrack ? activeTrack.label : 'off';
+                            console.log('Switched to subtitle track:', activeTrack ? activeTrack.label : 'None');
+                        }});
+                    }}
+
                     player.on('loadedmetadata', function() {{
-                        const audioTracks = player.audioTracks();
-                        if (audioTracks && audioTracks.length > 0) {{
-                            console.log('Audio tracks available:', audioTracks.length);
-                            for (let i = 0; i < audioTracks.length; i++) {{
-                                const track = audioTracks[i];
-                                console.log('Audio track:', track.label, track.enabled);
-                            }}
-                        }} else {{
-                            console.log('No audio tracks detected');
-                        }}
-
-                        const textTracks = player.textTracks();
-                        if (textTracks && textTracks.length > 0) {{
-                            console.log('Subtitle tracks available:', textTracks.length);
-                            for (let i = 0; i < textTracks.length; i++) {{
-                                const track = textTracks[i];
-                                console.log('Subtitle track:', track.label, track.mode);
-                                if (track.mode === 'showing') {{
-                                    track.mode = 'showing';
-                                }}
-                            }}
-                        }} else {{
-                            console.log('No subtitle tracks detected');
-                        }}
-                    }});
-
-                    player.audioTracks().addEventListener('change', function() {{
-                        const tracks = player.audioTracks();
-                        const activeTrack = Array.from(tracks).find(track => track.enabled);
-                        console.log('Switched to audio track:', activeTrack ? activeTrack.label : 'None');
-                    }});
-
-                    player.textTracks().addEventListener('change', function() {{
-                        const tracks = player.textTracks();
-                        const activeTrack = Array.from(tracks).find(track => track.mode === 'showing');
-                        console.log('Switched to subtitle track:', activeTrack ? activeTrack.label : 'None');
+                        console.log('Audio tracks:', audioTracks ? audioTracks.length : 0);
+                        console.log('Text tracks:', textTracks ? textTracks.length : 0);
                     }});
                 }});
 
@@ -416,9 +516,15 @@ async def serve_video_player(request):
                     }}, 1000);
                 }}
 
+                function toggleSettings() {{
+                    const overlay = document.getElementById('settings-overlay');
+                    overlay.classList.toggle('show');
+                }}
+
                 player.on('loadedmetadata', function() {{
                     document.querySelector('.logo').style.zIndex = '1000';
                     document.querySelector('.video-title').style.zIndex = '1000';
+                    document.querySelector('.settings-button').style.zIndex = '1000';
                 }});
             </script>
         </body>
