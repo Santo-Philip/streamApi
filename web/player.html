@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>{{ video_title }}</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link href="https://vjs.zencdn.net/8.10.0/video-js.css" rel="stylesheet" />
+    <script src="https://vjs.zencdn.net/8.10.0/video.min.js"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: #000;
+            overflow: hidden;
+        }
+        /* ... rest of CSS ... */
+    </style>
+</head>
+<body>
+    <div class="video-container">
+        <video id="video-player" class="video-js" controls preload="metadata">
+            <source src="{{ hls_path }}" type="application/x-mpegURL">
+        </video>
+        <div class="overlay-filename">{{ filename }}</div>
+        <div class="subtitle-overlay" id="subtitle-overlay"></div>
+        <div class="settings-button" onclick="toggleSettings()">
+            <!-- [SVG icon] -->
+        </div>
+        <div class="settings-menu" id="settings-menu">
+            <!-- [Settings menu content] -->
+        </div>
+    </div>
+    <script>
+        const player = videojs('video-player', {
+            fluid: true,
+            responsive: true,
+            autoplay: {{ "true" if should_autoplay else "false" }},
+            muted: {{ "true" if should_autoplay else "false" }},
+            html5: {
+                hls: {
+                    enableLowInitialPlaylist: true,
+                    overrideNative: true
+                }
+            },
+            controlBar: {
+                volumePanel: { inline: true },
+                fullscreenToggle: true,
+                pictureInPictureToggle: true
+            }
+        });
+
+        player.ready(function() {
+            if ({{ "true" if should_autoplay else "false" }}) {
+                player.play().catch(function(err) {
+                    console.log('Autoplay failed:', err);
+                });
+            }
+
+            // Audio Tracks
+            const audioTracks = player.audioTracks();
+            const audioSelect = document.getElementById('audio-tracks');
+            if (audioTracks && audioTracks.length > 0) {
+                for (let i = 0; i < audioTracks.length; i++) {
+                    const track = audioTracks[i];
+                    const option = document.createElement('option');
+                    option.value = track.id;
+                    option.text = track.label || `Track ${i + 1}`;
+                    if (track.enabled) option.selected = true;
+                    audioSelect.appendChild(option);
+                }
+                audioSelect.onchange = function() {
+                    const currentTracks = player.audioTracks();
+                    for (let j = 0; j < currentTracks.length; j++) {
+                        currentTracks[j].enabled = currentTracks[j].id === this.value;
+                    }
+                };
+                audioTracks.on('change', function() {
+                    const currentTracks = player.audioTracks();
+                    const activeTrack = Array.from(currentTracks).find(t => t.enabled);
+                    audioSelect.value = activeTrack ? activeTrack.id : '';
+                });
+            }
+
+            // Subtitles (VTT support)
+            const textTracks = player.textTracks();
+            const subtitleSelect = document.getElementById('subtitle-tracks');
+            const subtitleOverlay = document.getElementById('subtitle-overlay');
+            if (textTracks && textTracks.length > 0) {
+                const setupSubtitleTrack = (track) => {
+                    if (track.kind === 'subtitles' || track.kind === 'captions') {
+                        const option = document.createElement('option');
+                        option.value = track.label;
+                        option.text = track.label || `Subtitle ${textTracks.length}`;
+                        subtitleSelect.appendChild(option);
+
+                        track.addEventListener('cuechange', function() {
+                            const currentTracks = player.textTracks();
+                            const activeTrack = Array.from(currentTracks).find(t => t.mode === 'showing');
+                            subtitleOverlay.textContent = activeTrack && activeTrack.activeCues && activeTrack.activeCues.length > 0
+                                ? activeTrack.activeCues[0].text
+                                : '';
+                        });
+                    }
+                };
+                for (let i = 0; i < textTracks.length; i++) {
+                    setupSubtitleTrack(textTracks[i]);
+                }
+                subtitleSelect.onchange = function() {
+                    const currentTracks = player.textTracks();
+                    for (let j = 0; j < currentTracks.length; j++) {
+                        currentTracks[j].mode = (this.value === 'off' || currentTracks[j].label !== this.value) ? 'disabled' : 'showing';
+                    }
+                };
+            }
+
+            // Playback Speed
+            const playbackSpeedSelect = document.getElementById('playback-speed');
+            playbackSpeedSelect.onchange = function() {
+                player.playbackRate(parseFloat(this.value));
+            };
+
+            // Quality
+            const qualitySelect = document.getElementById('quality-select');
+            player.on('loadedmetadata', function() {
+                const levels = player.qualityLevels && player.qualityLevels();
+                if (levels && levels.length > 0) {
+                    for (let i = 0; i < levels.length; i++) {
+                        const option = document.createElement('option');
+                        option.value = levels[i].height + 'p';
+                        option.text = levels[i].height + 'p';
+                        qualitySelect.appendChild(option);
+                    }
+                    qualitySelect.onchange = function() {
+                        const currentLevels = player.qualityLevels();
+                        const height = this.value === 'auto' ? null : parseInt(this.value);
+                        for (let j = 0; j < currentLevels.length; j++) {
+                            currentLevels[j].enabled = height === null || currentLevels[j].height === height;
+                        }
+                    };
+                    levels.on('change', function() {
+                        const currentLevels = player.qualityLevels();
+                        const selectedIndex = currentLevels.selectedIndex;
+                        qualitySelect.value = selectedIndex === -1 ? 'auto' : currentLevels[selectedIndex].height + 'p';
+                    });
+                }
+            });
+        });
+
+        function toggleSettings() {
+            const menu = document.getElementById('settings-menu');
+            menu.classList.toggle('show');
+        }
+
+        player.on('error', function() {
+            player.errorDisplay.open();
+        });
+    </script>
+</body>
+</html>
