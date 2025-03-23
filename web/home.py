@@ -94,7 +94,14 @@ async def serve_hls(request):
 
 async def serve_video_player(request):
     try:
-        # Get the token from the URL
+        with open('player.html', 'r', encoding='utf-8') as file:
+            html_content = file.read()
+
+        escaped_html = escape_braces_in_html(html_content)
+
+        with open('player.html', 'w', encoding='utf-8') as file:
+            file.write(escaped_html)
+
         token = request.match_info.get('token')
         if not token:
             logger.warning("Token is required")
@@ -177,3 +184,9 @@ def safe_str(value):
     Safely converts a value to a string, escaping special characters to avoid HTML template issues.
     """
     return str(value).replace("{", "{{").replace("}", "}}")
+
+def escape_braces_in_html(html_content):
+    """
+    Escapes all standalone { and } in the HTML content to {{ and }} to avoid formatting issues.
+    """
+    return html_content.replace("{", "{{").replace("}", "}}")
