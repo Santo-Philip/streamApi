@@ -91,17 +91,31 @@ async def serve_hls(request):
         logger.error(f"Error serving HLS file: {str(e)}")
         return web.Response(text=f"Error serving HLS file: {str(e)}", status=500)
 
+def escape_braces_in_html(html_content):
+    """
+    Escapes all standalone `{` and `}` in the HTML content to `{{` and `}}`
+    for safe usage with str.format().
+    """
+    return html_content.replace("{", "{{").replace("}", "}}")
+
+def safe_str(value):
+    """
+    Safely converts a value to a string, escaping special characters if needed.
+    """
+    return str(value).replace("{", "{{").replace("}", "}}")
 
 async def serve_video_player(request):
     try:
-        with open('player.html', 'r', encoding='utf-8') as file:
-            html_content = file.read()
+        # Read and escape braces in the HTML template
+        html_file_path = os.path.join(os.path.dirname(__file__), 'player.html')
+        if not os.path.exists(html_file_path):
+            logger.error(f"HTML file not found at: {html_file_path}")
+            return web.Response(text="Server error: HTML template not found", status=500)
 
-        escaped_html = escape_braces_in_html(html_content)
+        with open(html_file_path, 'r', encoding='utf-8') as file:
+            html_content = escape_braces_in_html(file.read())
 
-        with open('player.html', 'w', encoding='utf-8') as file:
-            file.write(escaped_html)
-
+        # Get the token from the request
         token = request.match_info.get('token')
         if not token:
             logger.warning("Token is required")
@@ -113,7 +127,7 @@ async def serve_video_player(request):
             logger.warning(f"Video not found for token: {token}")
             return web.Response(text="Invalid token or video not found", status=404)
 
-        # Extract video ID and other details
+        # Extract video ID and details
         video_id = video_details.get("video")
         if not video_id:
             logger.warning(f"Video ID not found in details for token: {token}")
@@ -122,29 +136,12 @@ async def serve_video_player(request):
         # Determine autoplay behavior
         should_autoplay = request.query.get('play', '').strip().lower() in ['true', '1', 'yes']
 
-        # HLS path for video streaming
+        # Generate HLS path and other video details
         hls_path = f"/hls/{video_id}/master.m3u8"
-
-        # Fallback values for title and filename
         video_title = video_details.get('title', 'Video Player')
         filename = video_details.get('filename', video_id)
 
-        # Path to the HTML file
-        html_file_path = os.path.join(os.path.dirname(__file__), 'player.html')
-
-        # Check if the file exists
-        if not os.path.exists(html_file_path):
-            logger.error(f"HTML file not found at: {html_file_path}")
-            return web.Response(text="Server error: HTML template not found", status=500)
-
-        # Read the HTML template
-        with open(html_file_path, 'r', encoding='utf-8') as file:
-            html_content = file.read()
-
-        # Log raw HTML length for debugging
-        logger.debug(f"Raw HTML content length: {len(html_content)}")
-
-        # Safely format placeholders in the HTML
+        # Safely format placeholders in the HTML template
         try:
             html_content = html_content.format(
                 video_title=safe_str(video_title),
@@ -159,34 +156,18 @@ async def serve_video_player(request):
             logger.error(f"Error formatting HTML template: {e}")
             return web.Response(text=f"Error formatting template: {e}", status=500)
 
-        # Log the formatted HTML length for debugging
-        logger.debug(f"Formatted HTML content length: {len(html_content)}")
-
-        # Create a response with the formatted HTML content
+        # Return the formatted HTML response
         response = web.Response(text=html_content, content_type='text/html')
         response.headers['X-Frame-Options'] = 'ALLOWALL'
         return response
 
     except FileNotFoundError as e:
-        # Log file-specific errors
+        # Handle file errors
         logger.error(f"File error: {str(e)}")
         return web.Response(text="Server error: Video player template not found", status=500)
 
     except Exception as e:
-        # Log full traceback for debugging unexpected errors
+        # Log unexpected errors with traceback
         error_details = traceback.format_exc()
         logger.error(f"Error serving video player: {str(e)}\nFull traceback: {error_details}")
         return web.Response(text=f"Unexpected error: {str(e)}\nDetails: {error_details}", status=500)
-
-
-def safe_str(value):
-    """
-    Safely converts a value to a string, escaping special characters to avoid HTML template issues.
-    """
-    return str(value).replace("{", "{{").replace("}", "}}")
-
-def escape_braces_in_html(html_content):
-    """
-    Escapes all standalone { and } in the HTML content to {{ and }} to avoid formatting issues.
-    """
-    return html_content.replace("{", "{{").replace("}", "}}")
