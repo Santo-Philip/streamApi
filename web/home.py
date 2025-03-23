@@ -114,7 +114,7 @@ async def serve_video_player(request):
         filename = video_details.get('filename', video_id)
 
         # Define the path to the HTML file in the same directory as the Python file
-        html_file_path = os.path.join(os.path.dirname(__file__), 'video_player.html')
+        html_file_path = os.path.join(os.path.dirname(__file__), 'player.html')
 
         # Read the HTML file content
         with open(html_file_path, 'r', encoding='utf-8') as file:
