@@ -116,25 +116,44 @@ async def serve_video_player(request):
         # Define the path to the HTML file in the same directory as the Python file
         html_file_path = os.path.join(os.path.dirname(__file__), 'player.html')
 
+        # Verify file exists
+        if not os.path.exists(html_file_path):
+            raise FileNotFoundError(f"HTML file not found at: {html_file_path}")
+
         # Read the HTML file content
         with open(html_file_path, 'r', encoding='utf-8') as file:
             html_content = file.read()
 
+        # Log the raw content for debugging
+        logger.debug(f"Raw HTML content length: {len(html_content)}")
+
         # Replace placeholders with dynamic values
-        html_content = html_content.format(
-            video_title=video_title,
-            hls_path=hls_path,
-            filename=filename,
-            should_autoplay=str(should_autoplay).lower()
-        )
+        try:
+            html_content = html_content.format(
+                video_title=video_title,
+                hls_path=hls_path,
+                filename=filename,
+                should_autoplay=str(should_autoplay).lower()
+            )
+        except KeyError as ke:
+            logger.error(f"Missing placeholder in HTML: {ke}")
+            return web.Response(text=f"Error in template: Missing placeholder {ke}", status=500)
+        except ValueError as ve:
+            logger.error(f"Formatting error: {ve}")
+            return web.Response(text=f"Error formatting template: {ve}", status=500)
+
+        # Log the formatted content length for debugging
+        logger.debug(f"Formatted HTML content length: {len(html_content)}")
 
         response = web.Response(text=html_content, content_type='text/html')
         response.headers['X-Frame-Options'] = 'ALLOWALL'
         return response
 
-    except FileNotFoundError:
-        logger.error(f"HTML file not found at: {html_file_path}")
+    except FileNotFoundError as e:
+        logger.error(f"File error: {str(e)}")
         return web.Response(text="Server configuration error: Video player template not found", status=500)
     except Exception as e:
-        logger.error(f"Error serving video player: {str(e)}")
-        return web.Response(text=f"Error serving video player: {str(e)}", status=500)
+        # Log the full stack trace for better debugging
+        error_details = traceback.format_exc()
+        logger.error(f"Error serving video player: {str(e)}\nFull traceback: {error_details}")
+        return web.Response(text=f"Error serving video player: {str(e)}\nDetails: {error_details}", status=500)
