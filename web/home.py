@@ -4,8 +4,6 @@ from aiohttp import web
 from typing import Optional, Dict, Any
 import logging
 from dotenv import load_dotenv
-from datetime import datetime, timedelta
-import secrets
 
 from database.spbase import supabase
 
@@ -16,50 +14,20 @@ load_dotenv()
 # Configuration
 BASE_DIR = os.path.join(os.getcwd(), "downloads")
 LOGO_URL = os.getenv("LOGO", "https://example.com/default-logo.png")
-ALLOWED_ORIGINS = {os.getenv("ALLOWED_ORIGIN", "https://media.mehub.in")}
-TOKEN_EXPIRY = timedelta(minutes=15)
-CDN_BASE_URL = os.getenv("CDN_BASE_URL", "")  # Add your CDN URL in .env
-
-# Token storage (consider Redis in production)
-active_tokens: Dict[str, Dict[str, Any]] = {}
+ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "https://yourdomain.com").split(",")  # Comma-separated list in .env
 
 os.makedirs(BASE_DIR, exist_ok=True)
 
 
-async def generate_secure_token(video_id: str) -> str:
-    """Generate a secure, time-limited token for video access"""
-    token = secrets.token_urlsafe(32)
-    active_tokens[token] = {
-        'video_id': video_id,
-        'expiry': datetime.now() + TOKEN_EXPIRY,
-        'used': False
-    }
-    return token
-
-
-async def validate_token(token: str) -> Optional[str]:
-    """Validate token and return video_id if valid"""
-    if token not in active_tokens:
-        return None
-
-    token_info = active_tokens[token]
-    if token_info['used'] or datetime.now() > token_info['expiry']:
-        del active_tokens[token]
-        return None
-
-    token_info['used'] = True  # Mark as used for one-time access
-    return token_info['video_id']
-
-
 async def fetch_video_details(token: str) -> Optional[Dict[str, Any]]:
-    """Fetch video details from Supabase with security checks"""
+    """Fetch video details from Supabase using the existing token"""
     try:
         if not token:
             return None
 
-        uuid_token = uuid.UUID(token)  # Will raise ValueError if invalid
+        uuid_token = uuid.UUID(token)  # Validate UUID format
         response = await supabase.table("stream") \
-            .select("video, title") \
+            .select("video, title, token") \
             .eq("token", str(uuid_token)) \
             .limit(1) \
             .execute()
@@ -71,7 +39,7 @@ async def fetch_video_details(token: str) -> Optional[Dict[str, Any]]:
 
 
 async def serve_hls(request):
-    """Securely serve HLS files with CDN support"""
+    """Securely serve HLS files using Supabase token"""
     try:
         # Origin check
         origin = request.headers.get('Origin')
@@ -81,7 +49,12 @@ async def serve_hls(request):
         token = request.query.get('token')
         file_name = request.match_info.get('file', 'master.m3u8')
 
-        if not token or not await validate_token(token):
+        if not token:
+            return web.Response(text="Token required", status=401)
+
+        # Validate token exists in Supabase
+        video_details = await fetch_video_details(token)
+        if not video_details or video_details['token'] != token:
             return web.Response(text="Invalid or expired token", status=401)
 
         file_path = os.path.join(BASE_DIR, file_name)
@@ -104,7 +77,7 @@ async def serve_hls(request):
 
 
 async def serve_video_player(request):
-    """Serve secure video player with CDN optimization"""
+    """Serve secure video player using Supabase token"""
     try:
         token = request.match_info.get('token')
         if not token:
@@ -118,8 +91,7 @@ async def serve_video_player(request):
         video_title = video_details.get('title', 'Video Player')
         should_autoplay = request.query.get('play', 'false').lower() == 'true'
 
-        # Use CDN if configured, otherwise local path
-        hls_path = f"{CDN_BASE_URL}/hls/{video_id}/master.m3u8" if CDN_BASE_URL else f"/hls/{video_id}/master.m3u8?token={token}"
+        hls_path = f"/hls/{video_id}/master.m3u8?token={token}"
 
         html_content = f"""
 <!DOCTYPE html>
@@ -177,7 +149,7 @@ async def serve_video_player(request):
 """
         response = web.Response(text=html_content, content_type='text/html')
         response.headers.update({
-            'X-Frame-Options': 'DENY',  # Changed from ALLOWALL for security
+            'X-Frame-Options': 'DENY',
             'Content-Security-Policy': "default-src 'self' https://vjs.zencdn.net; img-src 'self' data: https:;",
             'Cache-Control': 'no-store, no-cache, must-revalidate'
         })
