@@ -91,6 +91,8 @@ async def serve_hls(request):
         logger.error(f"Error serving HLS file: {str(e)}")
         return web.Response(text=f"Error serving HLS file: {str(e)}", status=500)
 
+
+
 async def serve_video_player(request):
     try:
         token = request.match_info.get('token')
@@ -124,9 +126,6 @@ async def serve_video_player(request):
         with open(html_file_path, 'r', encoding='utf-8') as file:
             html_content = file.read()
 
-        # Log the raw content for debugging
-        logger.debug(f"Raw HTML content length: {len(html_content)}")
-
         # Replace placeholders with dynamic values
         try:
             html_content = html_content.format(
@@ -141,9 +140,6 @@ async def serve_video_player(request):
         except ValueError as ve:
             logger.error(f"Formatting error: {ve}")
             return web.Response(text=f"Error formatting template: {ve}", status=500)
-
-        # Log the formatted content length for debugging
-        logger.debug(f"Formatted HTML content length: {len(html_content)}")
 
         response = web.Response(text=html_content, content_type='text/html')
         response.headers['X-Frame-Options'] = 'ALLOWALL'
