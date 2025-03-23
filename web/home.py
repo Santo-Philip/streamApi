@@ -108,11 +108,10 @@ async def serve_video_player(request):
             logger.warning(f"Video ID not found in details for token: {token}")
             return web.Response(text="Video ID not found in details", status=404)
 
-        # Check for play=true query parameter
         should_autoplay = request.query.get('play', '').lower() == 'true'
-
         hls_path = f"/hls/{video_id}/master.m3u8"
         video_title = video_details.get('title', 'Video Player')
+        filename = video_details.get('filename', video_id)
 
         html_content = f"""
         <!DOCTYPE html>
@@ -132,132 +131,80 @@ async def serve_video_player(request):
                 }}
                 .video-container {{
                     position: relative;
+                    width: 100%;
+                    height: 100vh;
                 }}
                 .video-js {{ 
                     width: 100%; 
                     height: 100%;
-                    border-radius: 0;
                 }}
                 .vjs-control-bar {{
                     background: linear-gradient(to top, rgba(0,0,0,0.9), rgba(0,0,0,0.7));
-                    height: 3.5em;
-                    padding: 0 10px;
                 }}
-                .vjs-progress-control {{
-                    flex: 1;
-                    margin: 0 10px;
-                }}
-                .vjs-progress-holder {{
-                    height: 6px !important;
-                    background: rgba(255, 255, 255, 0.2) !important;
-                    border-radius: 3px;
-                    overflow: hidden;
-                    position: relative;
-                    transition: all 0.2s ease;
-                }}
-                .vjs-progress-holder:hover {{
-                    height: 8px !important;
-                }}
-                .vjs-load-progress {{
-                    background: rgba(255, 255, 255, 0.4) !important;
-                }}
-                .vjs-play-progress {{
-                    background: linear-gradient(90deg, #ff416c, #ff4b2b) !important;
-                    border-radius: 3px;
-                    position: relative;
-                }}
-                .vjs-play-progress:before {{
-                    content: '';
-                    position: absolute;
-                    right: -6px;
-                    top: 50%;
-                    transform: translateY(-50%);
-                    width: 12px;
-                    height: 12px;
-                    background: #fff;
-                    border-radius: 50%;
-                    box-shadow: 0 0 4px rgba(0,0,0,0.5);
-                    transition: all 0.2s ease;
-                }}
-                .vjs-progress-holder:hover .vjs-play-progress:before {{
-                    width: 14px;
-                    height: 14px;
-                }}
-                .vjs-volume-panel .vjs-volume-bar {{
-                    background: #fff;
-                }}
-                .vjs-button > .vjs-icon-placeholder:before {{
-                    color: #fff;
-                }}
-                .vjs-menu-button-popup .vjs-menu .vjs-menu-content {{
-                    background-color: rgba(0, 0, 0, 0.8);
-                    color: #fff;
-                }}
-                .vjs-menu-button-popup .vjs-menu .vjs-menu-item:hover {{
-                    background-color: #ff416c;
-                }}
-                .logo {{
-                    position: absolute;
-                    top: 1vw;
-                    right: 1vw;
-                    width: 5vw;
-                    max-width: 50px;
-                    min-width: 20px;
-                    opacity: 0.5;
-                    pointer-events: none;
-                    z-index: 1000;
-                    transition: opacity 0.3s ease;
-                }}
-                .logo:hover {{
-                    opacity: 0.8;
-                }}
-                @media (max-width: 600px) {{
-                    .logo {{
-                        top: 0.5vw;
-                        right: 0.5vw;
-                        width: 6vw;
-                    }}
-                }}
-                .vjs-error-display {{
-                    color: #ff4444;
-                    text-align: center;
-                }}
-                .video-title {{
+                .overlay-filename {{
                     position: absolute;
                     top: 10px;
                     left: 10px;
                     color: #fff;
-                    font-family: Arial, sans-serif;
-                    font-size: 16px;
+                    background: rgba(0,0,0,0.7);
                     padding: 5px 10px;
-                    background: linear-gradient(to top, rgba(0,0,0,0.9), rgba(0,0,0,0.7));
                     border-radius: 3px;
-                    opacity: 0;
-                    z-index: 1000;
-                    transition: opacity 0.3s ease;
-                }}
-                .vjs-control-bar:not(.vjs-hidden) ~ .video-title {{
-                    opacity: 1;
-                }}
-                .seek-info {{
-                    position: absolute;
-                    top: 50%;
-                    left: 50%;
-                    transform: translate(-50%, -50%);
-                    color: #fff;
                     font-family: Arial, sans-serif;
-                    font-size: 24px;
-                    padding: 10px 20px;
-                    background: rgba(0, 0, 0, 0.8);
-                    border-radius: 5px;
-                    opacity: 0;
                     z-index: 1000;
-                    pointer-events: none;
-                    transition: opacity 0.3s ease, transform 0.3s ease;
                 }}
-                .seek-info.show {{
-                    opacity: 1;
-                    transform: translate(-50%, -60%);
+                .subtitle-overlay {{
+                    position: absolute;
+                    bottom: 60px;
+                    left: 10px;
+                    right: 10px;
+                    color: #fff;
+                    background: rgba(0,0,0,0.7);
+                    padding: 10px;
+                    border-radius: 3px;
+                    font-family: Arial, sans-serif;
+                    font-size: 18px;
+                    text-align: center;
+                    z-index: 1000;
+                    text-shadow: 1px 1px 2px #000;
+                }}
+                .settings-button {{
+                    position: absolute;
+                    top: 10px;
+                    right: 10px;
+                    z-index: 1000;
+                    cursor: pointer;
+                    padding: 5px;
+                    background: rgba(0,0,0,0.7);
+                    border-radius: 3px;
+                }}
+                .settings-menu {{
+                    display: none;
+                    position: absolute;
+                    top: 40px;
+                    right: 10px;
+                    background: rgba(0,0,0,0.9);
+                    color: #fff;
+                    padding: 10px;
+                    border-radius: 5px;
+                    z-index: 1001;
+                    min-width: 200px;
+                }}
+                .settings-menu.show {{
+                    display: block;
+                }}
+                .settings-item {{
+                    padding: 5px 0;
+                    cursor: pointer;
+                }}
+                .settings-item:hover {{
+                    background: #ff416c;
+                }}
+                .settings-item select {{
+                    width: 100%;
+                    background: #333;
+                    color: #fff;
+                    border: none;
+                    padding: 5px;
                 }}
             </style>
         </head>
@@ -265,11 +212,43 @@ async def serve_video_player(request):
             <div class="video-container">
                 <video id="video-player" class="video-js" controls preload="metadata">
                     <source src="{hls_path}" type="application/x-mpegURL">
-                    Your browser does not support the video tag.
                 </video>
-                <img src="{logo_url}" class="logo" alt="Logo" onerror="this.style.display='none'">
-                <div class="video-title">{video_title}</div>
-                <div class="seek-info" id="seek-info"></div>
+                <div class="overlay-filename">{filename}</div>
+                <div class="subtitle-overlay" id="subtitle-overlay"></div>
+                <div class="settings-button" onclick="toggleSettings()">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="#fff">
+                        <path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.06-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.43-.48-.43h-3.84c-.24 0-.43.19-.47.43l-.36 2.54c-.59.24-1.13.56-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.04.3-.06.62-.06.94s.02.64.06.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.43.48.43h3.84c.24 0 .44-.19.47-.43l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/>
+                    </svg>
+                </div>
+                <div class="settings-menu" id="settings-menu">
+                    <div class="settings-item">
+                        <label>Audio Track:</label>
+                        <select id="audio-tracks"></select>
+                    </div>
+                    <div class="settings-item">
+                        <label>Subtitles:</label>
+                        <select id="subtitle-tracks">
+                            <option value="off">Off</option>
+                        </select>
+                    </div>
+                    <div class="settings-item">
+                        <label>Playback Speed:</label>
+                        <select id="playback-speed">
+                            <option value="0.5">0.5x</option>
+                            <option value="0.75">0.75x</option>
+                            <option value="1" selected>1x</option>
+                            <option value="1.25">1.25x</option>
+                            <option value="1.5">1.5x</option>
+                            <option value="2">2x</option>
+                        </select>
+                    </div>
+                    <div class="settings-item">
+                        <label>Quality:</label>
+                        <select id="quality-select">
+                            <option value="auto" selected>Auto</option>
+                        </select>
+                    </div>
+                </div>
             </div>
             <script>
                 const player = videojs('video-player', {{
@@ -279,133 +258,108 @@ async def serve_video_player(request):
                     muted: {str(should_autoplay).lower()},
                     html5: {{
                         hls: {{
-                            enableLowInitialPlaylist: true
+                            enableLowInitialPlaylist: true,
+                            overrideNative: true
                         }}
                     }},
                     controlBar: {{
                         volumePanel: {{ inline: true }},
                         fullscreenToggle: true,
-                        pictureInPictureToggle: true,
-                        currentTimeDisplay: true,
-                        timeDivider: true,
-                        durationDisplay: true,
-                        remainingTimeDisplay: false,
-                        progressControl: {{
-                            seekBar: true
-                        }},
-                        audioTrackButton: true,
-                        textTrackButton: true
+                        pictureInPictureToggle: true
                     }}
-                }});
-
-                player.on('error', function() {{
-                    player.errorDisplay.open();
                 }});
 
                 player.ready(function() {{
-                    // Only attempt to play if autoplay is explicitly enabled
                     if ({str(should_autoplay).lower()}) {{
-                        player.play().catch(function(err) {{
-                            console.log('Autoplay failed:', err);
-                        }});
+                        player.play().catch(err => console.log('Autoplay failed:', err));
                     }}
 
+                    // Audio Tracks
+                    const audioTracks = player.audioTracks();
+                    const audioSelect = document.getElementById('audio-tracks');
+                    audioTracks.on('change', function() {{
+                        const activeTrack = Array.from(audioTracks).find(t => t.enabled);
+                        audioSelect.value = activeTrack ? activeTrack.id : '';
+                    }});
+                    for (let i = 0; i < audioTracks.length; i++) {{
+                        const track = audioTracks[i];
+                        const option = document.createElement('option');
+                        option.value = track.id;
+                        option.text = track.label || `Track ${i + 1}`;
+                        if (track.enabled) option.selected = true;
+                        audioSelect.appendChild(option);
+                    }}
+                    audioSelect.onchange = function() {{
+                        for (let i = 0; i < audioTracks.length; i++) {{
+                            audioTracks[i].enabled = audioTracks[i].id === this.value;
+                        }}
+                    }};
+
+                    // Subtitles
+                    const textTracks = player.textTracks();
+                    const subtitleSelect = document.getElementById('subtitle-tracks');
+                    const subtitleOverlay = document.getElementById('subtitle-overlay');
+                    for (let i = 0; i < textTracks.length; i++) {{
+                        const track = textTracks[i];
+                        if (track.kind === 'subtitles' || track.kind === 'captions') {{
+                            const option = document.createElement('option');
+                            option.value = track.label;
+                            option.text = track.label || `Subtitle ${i + 1}`;
+                            subtitleSelect.appendChild(option);
+                        }}
+                    }}
+                    subtitleSelect.onchange = function() {{
+                        for (let i = 0; i < textTracks.length; i++) {{
+                            textTracks[i].mode = (this.value === 'off' || textTracks[i].label !== this.value) ? 'disabled' : 'showing';
+                        }}
+                    }};
+                    textTracks.on('change', function() {{
+                        const activeTrack = Array.from(textTracks).find(t => t.mode === 'showing');
+                        subtitleOverlay.textContent = activeTrack && activeTrack.activeCues && activeTrack.activeCues[0] ? activeTrack.activeCues[0].text : '';
+                        subtitleSelect.value = activeTrack ? activeTrack.label : 'off';
+                    }});
+
+                    // Playback Speed
+                    document.getElementById('playback-speed').onchange = function() {{
+                        player.playbackRate(parseFloat(this.value));
+                    }};
+
+                    // Quality (basic implementation - may need adjustment based on HLS manifest)
+                    const qualitySelect = document.getElementById('quality-select');
                     player.on('loadedmetadata', function() {{
-                        const audioTracks = player.audioTracks();
-                        if (audioTracks && audioTracks.length > 0) {{
-                            console.log('Audio tracks available:', audioTracks.length);
-                            for (let i = 0; i < audioTracks.length; i++) {{
-                                const track = audioTracks[i];
-                                console.log('Audio track:', track.label, track.enabled);
+                        const levels = player.qualityLevels?.();
+                        if (levels) {{
+                            levels.on('change', () => {{
+                                qualitySelect.value = levels.selectedIndex === -1 ? 'auto' : levels[levels.selectedIndex].height + 'p';
+                            }});
+                            for (let i = 0; i < levels.length; i++) {{
+                                const option = document.createElement('option');
+                                option.value = levels[i].height + 'p';
+                                option.text = levels[i].height + 'ps';
+                                qualitySelect.appendChild(option);
                             }}
-                        }} else {{
-                            console.log('No audio tracks detected');
                         }}
-
-                        const textTracks = player.textTracks();
-                        if (textTracks && textTracks.length > 0) {{
-                            console.log('Subtitle tracks available:', textTracks.length);
-                            for (let i = 0; i < textTracks.length; i++) {{
-                                const track = textTracks[i];
-                                console.log('Subtitle track:', track.label, track.mode);
-                                if (track.mode === 'showing') {{
-                                    track.mode = 'showing';
-                                }}
+                    }});
+                    qualitySelect.onchange = function() {{
+                        const levels = player.qualityLevels();
+                        if (this.value === 'auto') {{
+                            for (let i = 0; i < levels.length; i++) levels[i].enabled = true;
+                        }} else {{
+                            const height = parseInt(this.value);
+                            for (let i = 0; i < levels.length; i++) {{
+                                levels[i].enabled = levels[i].height === height;
                             }}
-                        }} else {{
-                            console.log('No subtitle tracks detected');
                         }}
-                    }});
-
-                    player.audioTracks().addEventListener('change', function() {{
-                        const tracks = player.audioTracks();
-                        const activeTrack = Array.from(tracks).find(track => track.enabled);
-                        console.log('Switched to audio track:', activeTrack ? activeTrack.label : 'None');
-                    }});
-
-                    player.textTracks().addEventListener('change', function() {{
-                        const tracks = player.textTracks();
-                        const activeTrack = Array.from(tracks).find(track => track.mode === 'showing');
-                        console.log('Switched to subtitle track:', activeTrack ? activeTrack.label : 'None');
-                    }});
+                    }};
                 }});
 
-                let lastTap = 0;
-                player.on('touchend', function(e) {{
-                    const now = Date.now();
-                    const timeSinceLastTap = now - lastTap;
-                    const videoRect = player.el().getBoundingClientRect();
-                    const tapX = e.changedTouches[0].clientX - videoRect.left;
-
-                    if (timeSinceLastTap < 300 && timeSinceLastTap > 0) {{
-                        const seekTime = tapX < videoRect.width / 2 ? -10 : 10;
-                        player.currentTime(player.currentTime() + seekTime);
-                        showSeekInfo(seekTime);
-                    }}
-                    lastTap = now;
-                }});
-
-                let isDragging = false;
-                let startX, startTime;
-                player.on('touchstart', function(e) {{
-                    isDragging = true;
-                    startX = e.touches[0].clientX;
-                    startTime = player.currentTime();
-                }});
-
-                player.on('touchmove', function(e) {{
-                    if (!isDragging) return;
-                    const videoRect = player.el().getBoundingClientRect();
-                    const currentX = e.touches[0].clientX;
-                    const deltaX = currentX - startX;
-                    const duration = player.duration() || 0;
-                    const seekRange = duration * (deltaX / videoRect.width);
-                    const newTime = Math.max(0, Math.min(duration, startTime + seekRange));
-                    player.currentTime(newTime);
-                }});
-
-                player.on('touchend', function() {{
-                    if (isDragging) {{
-                        const seekTime = player.currentTime() - startTime;
-                        if (Math.abs(seekTime) > 1) {{
-                            showSeekInfo(seekTime);
-                        }}
-                    }}
-                    isDragging = false;
-                }});
-
-                function showSeekInfo(seekTime) {{
-                    const seekInfo = document.getElementById('seek-info');
-                    seekInfo.textContent = (seekTime > 0 ? '+' : '') + Math.round(seekTime) + 's';
-                    seekInfo.classList.add('show');
-                    setTimeout(() => {{
-                        seekInfo.classList.remove('show');
-                    }}, 1000);
+                function toggleSettings() {{
+                    const menu = document.getElementById('settings-menu');
+                    menu.classList.toggle('show');
                 }}
 
-                player.on('loadedmetadata', function() {{
-                    document.querySelector('.logo').style.zIndex = '1000';
-                    document.querySelector('.video-title').style.zIndex = '1000';
+                player.on('error', function() {{
+                    player.errorDisplay.open();
                 }});
             </script>
         </body>
