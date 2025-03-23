@@ -16,7 +16,7 @@ load_dotenv()
 # Configuration
 BASE_DIR = os.path.join(os.getcwd(), "downloads")
 LOGO_URL = os.getenv("LOGO", "https://example.com/default-logo.png")
-ALLOWED_ORIGINS = {os.getenv("ALLOWED_ORIGIN", "https://yourdomain.com")}
+ALLOWED_ORIGINS = {os.getenv("ALLOWED_ORIGIN", "https://media.mehub.in")}
 TOKEN_EXPIRY = timedelta(minutes=15)
 CDN_BASE_URL = os.getenv("CDN_BASE_URL", "")  # Add your CDN URL in .env
 
