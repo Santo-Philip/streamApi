@@ -1,5 +1,4 @@
 import os
-import re
 import traceback
 import uuid
 from aiohttp import web
@@ -92,8 +91,6 @@ async def serve_hls(request):
         logger.error(f"Error serving HLS file: {str(e)}")
         return web.Response(text=f"Error serving HLS file: {str(e)}", status=500)
 
-
-
 async def serve_video_player(request):
     try:
         token = request.match_info.get('token')
@@ -129,17 +126,6 @@ async def serve_video_player(request):
 
         # Log the raw content for debugging
         logger.debug(f"Raw HTML content length: {len(html_content)}")
-
-        # Check for all placeholders in the template
-        placeholders = re.findall(r'\{([^}]*)\}', html_content)
-        expected_placeholders = {'video_title', 'hls_path', 'filename', 'should_autoplay'}
-        unexpected_placeholders = [ph for ph in placeholders if ph and ph not in expected_placeholders]
-        if unexpected_placeholders:
-            logger.error(f"Unexpected placeholders found in template: {unexpected_placeholders}")
-            return web.Response(
-                text=f"Error in template: Unexpected placeholders {unexpected_placeholders}",
-                status=500
-            )
 
         # Replace placeholders with dynamic values
         try:
