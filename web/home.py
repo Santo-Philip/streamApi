@@ -114,7 +114,14 @@ async def serve_video_player(request):
         video_title = video_details.get('title', 'Video Player')
         filename = video_details.get('filename', video_id)
 
-        html_file_path = os.path.join(os.path.dirname(__file__), 'player.html')
+        # Log the substituted values for debugging
+        logger.info(f"Video ID: {video_id}")
+        logger.info(f"HLS Path: {hls_path}")
+        logger.info(f"Video Title: {video_title}")
+        logger.info(f"Filename: {filename}")
+        logger.info(f"Should Autoplay: {should_autoplay}")
+
+        html_file_path = os.path.join(os.path.dirname(__file__), 'video_player.html')
 
         if not os.path.exists(html_file_path):
             raise FileNotFoundError(f"HTML file not found at: {html_file_path}")
@@ -122,10 +129,10 @@ async def serve_video_player(request):
         with open(html_file_path, 'r', encoding='utf-8') as file:
             html_content = file.read()
 
-        # Escape all curly braces to prevent unintended placeholder interpretation
+        # Escape all curly braces
         html_content = html_content.replace("{", "{{").replace("}", "}}")
 
-        # Manually replace the specific placeholders with their values
+        # Replace specific placeholders
         html_content = html_content.replace("{{video_title}}", video_title)
         html_content = html_content.replace("{{hls_path}}", hls_path)
         html_content = html_content.replace("{{filename}}", filename)
