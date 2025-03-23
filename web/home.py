@@ -91,83 +91,86 @@ async def serve_hls(request):
         logger.error(f"Error serving HLS file: {str(e)}")
         return web.Response(text=f"Error serving HLS file: {str(e)}", status=500)
 
-def escape_braces_in_html(html_content):
-    """
-    Escapes all standalone `{` and `}` in the HTML content to `{{` and `}}`
-    for safe usage with str.format().
-    """
-    return html_content.replace("{", "{{").replace("}", "}}")
 
-def safe_str(value):
-    """
-    Safely converts a value to a string, escaping special characters if needed.
-    """
-    return str(value).replace("{", "{{").replace("}", "}}")
+import os
+import traceback
+import re
+from aiohttp import web
+
 
 async def serve_video_player(request):
     try:
-        # Read and escape braces in the HTML template
-        html_file_path = os.path.join(os.path.dirname(__file__), 'player.html')
-        if not os.path.exists(html_file_path):
-            logger.error(f"HTML file not found at: {html_file_path}")
-            return web.Response(text="Server error: HTML template not found", status=500)
-
-        with open(html_file_path, 'r', encoding='utf-8') as file:
-            html_content = escape_braces_in_html(file.read())
-
-        # Get the token from the request
         token = request.match_info.get('token')
         if not token:
             logger.warning("Token is required")
             return web.Response(text="Token is required", status=400)
 
-        # Fetch video details based on the token
         video_details = await fetch_video_details(token)
         if not video_details:
             logger.warning(f"Video not found for token: {token}")
             return web.Response(text="Invalid token or video not found", status=404)
 
-        # Extract video ID and details
         video_id = video_details.get("video")
         if not video_id:
             logger.warning(f"Video ID not found in details for token: {token}")
             return web.Response(text="Video ID not found in details", status=404)
 
-        # Determine autoplay behavior
-        should_autoplay = request.query.get('play', '').strip().lower() in ['true', '1', 'yes']
-
-        # Generate HLS path and other video details
+        should_autoplay = request.query.get('play', '').lower() == 'true'
         hls_path = f"/hls/{video_id}/master.m3u8"
         video_title = video_details.get('title', 'Video Player')
         filename = video_details.get('filename', video_id)
 
-        # Safely format placeholders in the HTML template
+        # Define the path to the HTML file
+        html_file_path = os.path.join(os.path.dirname(__file__), 'video_player.html')
+
+        # Verify file exists
+        if not os.path.exists(html_file_path):
+            raise FileNotFoundError(f"HTML file not found at: {html_file_path}")
+
+        # Read the HTML file content
+        with open(html_file_path, 'r', encoding='utf-8') as file:
+            html_content = file.read()
+
+        # Log the raw content for debugging
+        logger.debug(f"Raw HTML content length: {len(html_content)}")
+
+        # Check for all placeholders in the template
+        placeholders = re.findall(r'\{([^}]*)\}', html_content)
+        expected_placeholders = {'video_title', 'hls_path', 'filename', 'should_autoplay'}
+        unexpected_placeholders = [ph for ph in placeholders if ph and ph not in expected_placeholders]
+        if unexpected_placeholders:
+            logger.error(f"Unexpected placeholders found in template: {unexpected_placeholders}")
+            return web.Response(
+                text=f"Error in template: Unexpected placeholders {unexpected_placeholders}",
+                status=500
+            )
+
+        # Replace placeholders with dynamic values
         try:
             html_content = html_content.format(
-                video_title=safe_str(video_title),
-                hls_path=safe_str(hls_path),
-                filename=safe_str(filename),
+                video_title=video_title,
+                hls_path=hls_path,
+                filename=filename,
                 should_autoplay=str(should_autoplay).lower()
             )
         except KeyError as ke:
-            logger.error(f"Missing placeholder in HTML: {ke}")
-            return web.Response(text=f"Template error: Missing placeholder {ke}", status=500)
-        except Exception as e:
-            logger.error(f"Error formatting HTML template: {e}")
-            return web.Response(text=f"Error formatting template: {e}", status=500)
+            logger.error(f"Missing or invalid placeholder in HTML: {ke}")
+            return web.Response(text=f"Error in template: Missing placeholder {ke}", status=500)
+        except ValueError as ve:
+            logger.error(f"Formatting error: {ve}")
+            return web.Response(text=f"Error formatting template: {ve}", status=500)
 
-        # Return the formatted HTML response
+        # Log the formatted content length for debugging
+        logger.debug(f"Formatted HTML content length: {len(html_content)}")
+
         response = web.Response(text=html_content, content_type='text/html')
         response.headers['X-Frame-Options'] = 'ALLOWALL'
         return response
 
     except FileNotFoundError as e:
-        # Handle file errors
         logger.error(f"File error: {str(e)}")
-        return web.Response(text="Server error: Video player template not found", status=500)
-
+        return web.Response(text="Server configuration error: Video player template not found", status=500)
     except Exception as e:
-        # Log unexpected errors with traceback
         error_details = traceback.format_exc()
         logger.error(f"Error serving video player: {str(e)}\nFull traceback: {error_details}")
-        return web.Response(text=f"Unexpected error: {str(e)}\nDetails: {error_details}", status=500)
+        return web.Response(text=f"Error serving video player: {str(e)}\nDetails: {error_details}", status=500)
