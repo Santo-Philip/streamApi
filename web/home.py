@@ -113,12 +113,14 @@ async def serve_video_player(request):
         video_title = video_details.get('title', 'Video Player')
         filename = video_details.get('filename', video_id)
 
-        # Define the path to the HTML file
-        html_file_path = os.path.join(os.path.dirname(__file__), 'static', 'player.html')
+        # Define the path to the HTML file in the same directory as the Python file
+        html_file_path = os.path.join(os.path.dirname(__file__), 'video_player.html')
 
         # Read the HTML file content
         with open(html_file_path, 'r', encoding='utf-8') as file:
             html_content = file.read()
+
+        # Replace placeholders with dynamic values
         html_content = html_content.format(
             video_title=video_title,
             hls_path=hls_path,
