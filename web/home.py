@@ -92,7 +92,6 @@ async def serve_hls(request):
         return web.Response(text=f"Error serving HLS file: {str(e)}", status=500)
 
 
-
 async def serve_video_player(request):
     try:
         token = request.match_info.get('token')
@@ -115,31 +114,22 @@ async def serve_video_player(request):
         video_title = video_details.get('title', 'Video Player')
         filename = video_details.get('filename', video_id)
 
-        # Define the path to the HTML file
         html_file_path = os.path.join(os.path.dirname(__file__), 'player.html')
 
-        # Verify file exists
         if not os.path.exists(html_file_path):
             raise FileNotFoundError(f"HTML file not found at: {html_file_path}")
 
-        # Read the HTML file content
         with open(html_file_path, 'r', encoding='utf-8') as file:
             html_content = file.read()
 
-        # Replace placeholders with dynamic values
-        try:
-            html_content = html_content.format(
-                video_title=video_title,
-                hls_path=hls_path,
-                filename=filename,
-                should_autoplay=str(should_autoplay).lower()
-            )
-        except KeyError as ke:
-            logger.error(f"Missing or invalid placeholder in HTML: {ke}")
-            return web.Response(text=f"Error in template: Missing placeholder {ke}", status=500)
-        except ValueError as ve:
-            logger.error(f"Formatting error: {ve}")
-            return web.Response(text=f"Error formatting template: {ve}", status=500)
+        # Escape all curly braces to prevent unintended placeholder interpretation
+        html_content = html_content.replace("{", "{{").replace("}", "}}")
+
+        # Manually replace the specific placeholders with their values
+        html_content = html_content.replace("{{video_title}}", video_title)
+        html_content = html_content.replace("{{hls_path}}", hls_path)
+        html_content = html_content.replace("{{filename}}", filename)
+        html_content = html_content.replace("{{should_autoplay}}", str(should_autoplay).lower())
 
         response = web.Response(text=html_content, content_type='text/html')
         response.headers['X-Frame-Options'] = 'ALLOWALL'
