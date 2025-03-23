@@ -1,5 +1,5 @@
 from aiohttp import web
-from web.home import hello, serve_hls, serve_video_player
+from web.home import  serve_hls, serve_video_player
 import logging
 
 from web.index import video_index, delete_video
@@ -9,7 +9,6 @@ from web.server import websocket_handler, index_handler
 logger = logging.getLogger(__name__)
 async def start_web_server():
     app = web.Application(middlewares=[auth_middleware])
-    app.router.add_get('/', hello)
     app.router.add_get('/hls/{file:.+}', serve_hls)
     app.router.add_get('/video/{token}', serve_video_player)
     app.router.add_get('/videos', video_index)
