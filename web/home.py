@@ -121,7 +121,7 @@ async def serve_video_player(request):
         logger.info(f"Filename: {filename}")
         logger.info(f"Should Autoplay: {should_autoplay}")
 
-        html_file_path = os.path.join(os.path.dirname(__file__), 'video_player.html')
+        html_file_path = os.path.join(os.path.dirname(__file__), 'player.html')
 
         if not os.path.exists(html_file_path):
             raise FileNotFoundError(f"HTML file not found at: {html_file_path}")
