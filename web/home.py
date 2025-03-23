@@ -1,4 +1,5 @@
 import os
+import traceback
 import uuid
 from aiohttp import web
 from typing import Optional, Dict, Any
@@ -108,11 +109,12 @@ async def serve_video_player(request):
             logger.warning(f"Video ID not found in details for token: {token}")
             return web.Response(text="Video ID not found in details", status=404)
 
-        # Check for play=true query parameter
         should_autoplay = request.query.get('play', '').lower() == 'true'
-
+        autoplay_value = str(should_autoplay).lower()
         hls_path = f"/hls/{video_id}/master.m3u8"
         video_title = video_details.get('title', 'Video Player')
+        filename = video_details.get('filename', video_id)
+        logo_url = "https://example.com/logo.png"  # Replace with your logo URL or remove
 
         html_content = f"""
         <!DOCTYPE html>
@@ -259,6 +261,17 @@ async def serve_video_player(request):
                     opacity: 1;
                     transform: translate(-50%, -60%);
                 }}
+                .overlay-filename {{
+                    position: absolute;
+                    top: 40px;
+                    left: 10px;
+                    color: #fff;
+                    background: rgba(0,0,0,0.7);
+                    padding: 5px 10px;
+                    border-radius: 3px;
+                    font-family: Arial, sans-serif;
+                    z-index: 1000;
+                }}
             </style>
         </head>
         <body>
@@ -269,14 +282,15 @@ async def serve_video_player(request):
                 </video>
                 <img src="{logo_url}" class="logo" alt="Logo" onerror="this.style.display='none'">
                 <div class="video-title">{video_title}</div>
+                <div class="overlay-filename">{filename}</div>
                 <div class="seek-info" id="seek-info"></div>
             </div>
             <script>
                 const player = videojs('video-player', {{
                     fluid: true,
                     responsive: true,
-                    autoplay: {str(should_autoplay).lower()},
-                    muted: {str(should_autoplay).lower()},
+                    autoplay: {autoplay_value},
+                    muted: {autoplay_value},
                     html5: {{
                         hls: {{
                             enableLowInitialPlaylist: true
@@ -303,8 +317,7 @@ async def serve_video_player(request):
                 }});
 
                 player.ready(function() {{
-                    // Only attempt to play if autoplay is explicitly enabled
-                    if ({str(should_autoplay).lower()}) {{
+                    if ({autoplay_value}) {{
                         player.play().catch(function(err) {{
                             console.log('Autoplay failed:', err);
                         }});
@@ -415,5 +428,6 @@ async def serve_video_player(request):
         response.headers['X-Frame-Options'] = 'ALLOWALL'
         return response
     except Exception as e:
-        logger.error(f"Error serving video player: {str(e)}")
+        error_details = traceback.format_exc()
+        logger.error(f"Error serving video player: {str(e)}\nFull traceback: {error_details}")
         return web.Response(text=f"Error serving video player: {str(e)}", status=500)
