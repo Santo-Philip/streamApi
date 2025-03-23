@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>{{ video_title }}</title>
+    <title>{video_title}</title>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link href="https://vjs.zencdn.net/8.10.0/video-js.css" rel="stylesheet" />
@@ -13,29 +13,133 @@
             background: #000;
             overflow: hidden;
         }
-        /* ... rest of CSS ... */
+        .video-container {
+            position: relative;
+            width: 100%;
+            height: 100vh;
+        }
+        .video-js {
+            width: 100%;
+            height: 100%;
+        }
+        .vjs-control-bar {
+            background: linear-gradient(to top, rgba(0,0,0,0.9), rgba(0,0,0,0.7));
+        }
+        .overlay-filename {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            color: #fff;
+            background: rgba(0,0,0,0.7);
+            padding: 5px 10px;
+            border-radius: 3px;
+            font-family: Arial, sans-serif;
+            z-index: 1000;
+        }
+        .subtitle-overlay {
+            position: absolute;
+            bottom: 60px;
+            left: 10px;
+            right: 10px;
+            color: #fff;
+            background: rgba(0,0,0,0.7);
+            padding: 10px;
+            border-radius: 3px;
+            font-family: Arial, sans-serif;
+            font-size: 18px;
+            text-align: center;
+            z-index: 1000;
+            text-shadow: 1px 1px 2px #000;
+        }
+        .settings-button {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            z-index: 1000;
+            cursor: pointer;
+            padding: 5px;
+            background: rgba(0,0,0,0.7);
+            border-radius: 3px;
+        }
+        .settings-menu {
+            display: none;
+            position: absolute;
+            top: 40px;
+            right: 10px;
+            background: rgba(0,0,0,0.9);
+            color: #fff;
+            padding: 10px;
+            border-radius: 5px;
+            z-index: 1001;
+            min-width: 200px;
+        }
+        .settings-menu.show {
+            display: block;
+        }
+        .settings-item {
+            padding: 5px 0;
+            cursor: pointer;
+        }
+        .settings-item:hover {
+            background: #ff416c;
+        }
+        .settings-item select {
+            width: 100%;
+            background: #333;
+            color: #fff;
+            border: none;
+            padding: 5px;
+        }
     </style>
 </head>
 <body>
     <div class="video-container">
         <video id="video-player" class="video-js" controls preload="metadata">
-            <source src="{{ hls_path }}" type="application/x-mpegURL">
+            <source src="{hls_path}" type="application/x-mpegURL">
         </video>
-        <div class="overlay-filename">{{ filename }}</div>
+        <div class="overlay-filename">{filename}</div>
         <div class="subtitle-overlay" id="subtitle-overlay"></div>
         <div class="settings-button" onclick="toggleSettings()">
-            <!-- [SVG icon] -->
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="#fff">
+                <path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.06-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.43-.48-.43h-3.84c-.24 0-.43.19-.47.43l-.36 2.54c-.59.24-1.13.56-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.04.3-.06.62-.06.94s.02.64.06.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.43.48.43h3.84c.24 0 .44-.19.47-.43l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/>
+            </svg>
         </div>
         <div class="settings-menu" id="settings-menu">
-            <!-- [Settings menu content] -->
+            <div class="settings-item">
+                <label>Audio Track:</label>
+                <select id="audio-tracks"></select>
+            </div>
+            <div class="settings-item">
+                <label>Subtitles:</label>
+                <select id="subtitle-tracks">
+                    <option value="off">Off</option>
+                </select>
+            </div>
+            <div class="settings-item">
+                <label>Playback Speed:</label>
+                <select id="playback-speed">
+                    <option value="0.5">0.5x</option>
+                    <option value="0.75">0.75x</option>
+                    <option value="1" selected>1x</option>
+                    <option value="1.25">1.25x</option>
+                    <option value="1.5">1.5x</option>
+                    <option value="2">2x</option>
+                </select>
+            </div>
+            <div class="settings-item">
+                <label>Quality:</label>
+                <select id="quality-select">
+                    <option value="auto" selected>Auto</option>
+                </select>
+            </div>
         </div>
     </div>
     <script>
         const player = videojs('video-player', {
             fluid: true,
             responsive: true,
-            autoplay: {{ "true" if should_autoplay else "false" }},
-            muted: {{ "true" if should_autoplay else "false" }},
+            autoplay: {should_autoplay},
+            muted: {should_autoplay},
             html5: {
                 hls: {
                     enableLowInitialPlaylist: true,
@@ -50,7 +154,7 @@
         });
 
         player.ready(function() {
-            if ({{ "true" if should_autoplay else "false" }}) {
+            if ({should_autoplay}) {
                 player.play().catch(function(err) {
                     console.log('Autoplay failed:', err);
                 });
@@ -157,3 +261,58 @@
     </script>
 </body>
 </html>
+"""
+
+### Step 2: Update the Python Code to Read the File
+
+```python
+import os
+from aiohttp import web
+
+async def serve_video_player(request):
+    try:
+        token = request.match_info.get('token')
+        if not token:
+            logger.warning("Token is required")
+            return web.Response(text="Token is required", status=400)
+
+        video_details = await fetch_video_details(token)
+        if not video_details:
+            logger.warning(f"Video not found for token: {token}")
+            return web.Response(text="Invalid token or video not found", status=404)
+
+        video_id = video_details.get("video")
+        if not video_id:
+            logger.warning(f"Video ID not found in details for token: {token}")
+            return web.Response(text="Video ID not found in details", status=404)
+
+        should_autoplay = request.query.get('play', '').lower() == 'true'
+        hls_path = f"/hls/{video_id}/master.m3u8"
+        video_title = video_details.get('title', 'Video Player')
+        filename = video_details.get('filename', video_id)
+
+        # Define the path to the HTML file
+        html_file_path = os.path.join(os.path.dirname(__file__), 'static', 'video_player.html')
+
+        # Read the HTML file content
+        with open(html_file_path, 'r', encoding='utf-8') as file:
+            html_content = file.read()
+
+        # Replace placeholders with dynamic values
+        html_content = html_content.format(
+            video_title=video_title,
+            hls_path=hls_path,
+            filename=filename,
+            should_autoplay=str(should_autoplay).lower()
+        )
+
+        response = web.Response(text=html_content, content_type='text/html')
+        response.headers['X-Frame-Options'] = 'ALLOWALL'
+        return response
+
+    except FileNotFoundError:
+        logger.error(f"HTML file not found at: {html_file_path}")
+        return web.Response(text="Server configuration error: Video player template not found", status=500)
+    except Exception as e:
+        logger.error(f"Error serving video player: {str(e)}")
+        return web.Response(text=f"Error serving video player: {str(e)}", status=500)

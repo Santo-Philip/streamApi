@@ -113,83 +113,28 @@ async def serve_video_player(request):
         video_title = video_details.get('title', 'Video Player')
         filename = video_details.get('filename', video_id)
 
-        html_content = f"""
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <title>{video_title}</title>
-            <meta charset="UTF-8">
-            <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <link href="https://vjs.zencdn.net/8.10.0/video-js.css" rel="stylesheet" />
-            <script src="https://vjs.zencdn.net/8.10.0/video.min.js"></script>
-            <style>
-                body {{
-                    margin: 0;
-                    padding: 0;
-                    background: #000;
-                    overflow: hidden;
-                }}
-                .video-container {{
-                    position: relative;
-                    width: 100%;
-                    height: 100vh;
-                }}
-                .video-js {{
-                    width: 100%;
-                    height: 100%;
-                }}
-                .overlay-filename {{
-                    position: absolute;
-                    top: 10px;
-                    left: 10px;
-                    color: #fff;
-                    background: rgba(0,0,0,0.7);
-                    padding: 5px 10px;
-                    border-radius: 3px;
-                    font-family: Arial, sans-serif;
-                    z-index: 1000;
-                }}
-            </style>
-        </head>
-        <body>
-            <div class="video-container">
-                <video id="video-player" class="video-js" controls preload="metadata">
-                    <source src="{hls_path}" type="application/x-mpegURL">
-                </video>
-                <div class="overlay-filename">{filename}</div>
-            </div>
-            <script>
-                const player = videojs('video-player', {{
-                    fluid: true,
-                    responsive: true,
-                    autoplay: {str(should_autoplay).lower()},
-                    muted: {str(should_autoplay).lower()},
-                    html5: {{
-                        hls: {{
-                            enableLowInitialPlaylist: true,
-                            overrideNative: true
-                        }}
-                    }},
-                    controlBar: {{
-                        volumePanel: {{ inline: true }},
-                        fullscreenToggle: true,
-                        pictureInPictureToggle: true
-                    }}
-                }});
+        # Define the path to the HTML file
+        html_file_path = os.path.join(os.path.dirname(__file__), 'static', 'video_player.html')
 
-                player.ready(function() {{
-                    if ({str(should_autoplay).lower()}) {{
-                        player.play().catch(function(err) {{
-                            console.log('Autoplay failed:', err);
-                        }});
-                    }}
-                }});
-            </script>
-        </body>
-        </html>
-        """
-        return web.Response(text=html_content, content_type="text/html")
+        # Read the HTML file content
+        with open(html_file_path, 'r', encoding='utf-8') as file:
+            html_content = file.read()
 
+        # Replace placeholders with dynamic values
+        html_content = html_content.format(
+            video_title=video_title,
+            hls_path=hls_path,
+            filename=filename,
+            should_autoplay=str(should_autoplay).lower()
+        )
+
+        response = web.Response(text=html_content, content_type='text/html')
+        response.headers['X-Frame-Options'] = 'ALLOWALL'
+        return response
+
+    except FileNotFoundError:
+        logger.error(f"HTML file not found at: {html_file_path}")
+        return web.Response(text="Server configuration error: Video player template not found", status=500)
     except Exception as e:
-        logger.error(f"An error occurred: {e}")
-        return web.Response(text="Internal server error", status=500)
+        logger.error(f"Error serving video player: {str(e)}")
+        return web.Response(text=f"Error serving video player: {str(e)}", status=500)
